@@ -44,6 +44,8 @@ let crashedFlag = false;
 let blocker = null;
 let store; let diag; let watcher;
 let prefs = { closeToTray: false, bounds: null, max: false };
+const recFiles = new Map(); // id -> { fh, path }  (open recordings)
+let recSeq = 0;
 
 const prefsFile = () => path.join(app.getPath('userData'), 'prefs.json');
 const loadPrefs = () => { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) }; } catch { /* first run */ } };
@@ -222,6 +224,42 @@ function registerIpc() {
 
   handle('native:readTags', (p) => readTags(String(p)));
 
+  // ---- recording: write a file into a folder while it is being recorded ----
+  const uniqueName = (dir, name) => {
+    const ext = path.extname(name); const base = name.slice(0, name.length - ext.length);
+    let n = name; let i = 1;
+    while (fs.existsSync(path.join(dir, n))) { i++; n = `${base} (${i})${ext}`; if (i > 999) break; }
+    return n;
+  };
+  handle('native:fileOpen', async (dir, name) => {
+    dir = String(dir || '');
+    if (!dir || !path.isAbsolute(dir)) throw new Error('invalid folder');
+    const safe = path.basename(String(name || 'recording')).replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_');
+    if (!/\.(mp3|flac)$/i.test(safe)) throw new Error('invalid file type');
+    await fsp.mkdir(dir, { recursive: true });
+    const finalName = uniqueName(dir, safe);
+    const full = path.join(dir, finalName);
+    const fh = await fsp.open(full, 'wx');
+    const id = ++recSeq;
+    recFiles.set(id, { fh, path: full });
+    return { id, name: finalName, path: full };
+  });
+  handle('native:fileWrite', async (id, bytes, position) => {
+    const f = recFiles.get(id);
+    if (!f) throw new Error('file is not open');
+    const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (position == null) await f.fh.appendFile(buf); // continuous append
+    else await f.fh.write(buf, 0, buf.length, position); // e.g. FLAC header update
+    return true;
+  });
+  handle('native:fileClose', async (id) => {
+    const f = recFiles.get(id);
+    if (!f) return false;
+    recFiles.delete(id);
+    await f.fh.close();
+    return true;
+  });
+
   handle('lib:save', (json) => store.save(json));
   handle('lib:load', () => store.load());
   handle('lib:info', () => store.info());
@@ -283,7 +321,11 @@ async function start() {
     try {
       const file = pathFromUrl(req.url);
       if (!isAudio(file)) return new Response('forbidden', { status: 403 });
-      return await respond(file, req.headers.get('range'));
+      const r = await respond(file, req.headers.get('range'));
+      const h = new Headers(r.headers);
+      h.set('Access-Control-Allow-Origin', '*');
+      h.set('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+      return new Response(r.body, { status: r.status, statusText: r.statusText, headers: h });
     } catch {
       return new Response('not found', { status: 404 });
     }
@@ -308,6 +350,7 @@ app.on('before-quit', () => { quitting = true; });
 app.on('will-quit', () => {
   try { globalShortcut.unregisterAll(); } catch { /* ignore */ }
   if (watcher) watcher.close();
+  for (const f of recFiles.values()) { try { f.fh.close(); } catch { /* ignore */ } }
   try { fs.unlinkSync(markerFile()); } catch { /* ignore */ } // clean exit
 });
 app.on('window-all-closed', () => { app.quit(); });
