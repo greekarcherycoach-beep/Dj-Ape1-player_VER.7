@@ -1,0 +1,57 @@
+{
+  "name": "dj-ape1",
+  "productName": "Dj Ape1",
+  "version": "1.0.0",
+  "description": "Dj Ape1 — βιβλιοθήκη μουσικής με Dj mode (Automix, Smart Mix, επόμενο τραγούδι, playlists)",
+  "main": "main.js",
+  "author": "Dj Ape1",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/lib.test.js",
+    "dist": "electron-builder --win --x64 --publish never",
+    "dist:installer": "electron-builder --win nsis --x64 --publish never",
+    "dist:portable": "electron-builder --win portable --x64 --publish never"
+  },
+  "dependencies": {
+    "music-metadata": "^11.2.0"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.musiclibrary.djmode",
+    "productName": "Dj Ape1",
+    "copyright": "Dj Ape1",
+    "directories": { "output": "dist", "buildResources": "assets" },
+    "files": ["main.js", "preload.js", "lib/**", "app/**", "assets/icon.png", "package.json"],
+    "asar": true,
+    "forceCodeSigning": false,
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "fileAssociations": [
+        { "ext": ["mp3", "flac", "m4a", "aac", "ogg", "opus", "wav", "wma", "aiff"], "name": "Audio file", "role": "Viewer" }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Dj Ape1",
+      "deleteAppDataOnUninstall": false,
+      "language": "1032",
+      "artifactName": "Dj-Ape1-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Dj-Ape1-Portable-${version}.${ext}"
+    }
+  }
+}
