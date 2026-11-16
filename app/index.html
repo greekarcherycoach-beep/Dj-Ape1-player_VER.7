@@ -1821,7 +1821,7 @@ if(NATIVE){
  dk.onOpen(p=>openPaths(p,true));dk.getOpen().then(p=>{if(p&&p.length)openPaths(p,true)}).catch(()=>{});
  dk.native.onChanged(()=>{checkNew(false,true)});
  {const _rl=refreshLinks;refreshLinks=function(){_rl.apply(this,arguments);try{dk.native.watch(DIRS.filter(d=>d.handle&&d.handle.path).map(d=>d.handle.path))}catch(e){}}}
- dk.onFlush(async()=>{try{await nativeLibSave(true)}catch(e){}dk.flushDone()});
+ dk.onFlush(async()=>{try{if(typeof REC!=="undefined"&&REC.state==="rec")await recStop()}catch(e){}try{await nativeLibSave(true)}catch(e){}dk.flushDone()});
 }
 
 /* ===== v21 UI: themes, rule builder, suggestions, mini window ===== */
@@ -2391,6 +2391,8 @@ au.addEventListener("pause",()=>{if(WEBDIRTY&&!webBusy){WEBDIRTY=false;renderSof
 if(NATIVE){window.desktop.getCrash().then(c=>{if(c&&c.crashed)setTimeout(async()=>{try{await restoreLib()}catch(e){}toast("Η εφαρμογή ανέκαμψε από σφάλμα — η βιβλιοθήκη ανακτήθηκε")},900)}).catch(()=>{})}
 
 /* ===== v24: Record (MP3 320 kbps / FLAC) ===== */
+/* desktop: the djfile:// protocol answers with CORS headers, so the audio can be captured by Web Audio */
+if(NATIVE){au.crossOrigin="anonymous";const _A=window.Audio;window.Audio=function(...a){const e=new _A(...a);e.crossOrigin="anonymous";return e};window.Audio.prototype=_A.prototype}
 document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#recbtn{white-space:nowrap}#recbtn.on{background:#c62828;color:#fff;border-color:#c62828;animation:recp 1.4s ease-in-out infinite}#recbtn.pz{animation:none;background:#8a6d1a;border-color:#8a6d1a;color:#fff}@keyframes recp{50%{opacity:.62}}.recm{position:relative;height:10px;flex:1;border-radius:99px;overflow:hidden;background:linear-gradient(90deg,#4ade80 0,#4ade80 70%,#facc15 70%,#facc15 90%,#f43f5e 90%)}.recm i{position:absolute;right:0;top:0;bottom:0;width:100%;background:var(--bd);transition:width .08s}"}));
 const REC={state:"idle",paused:false,ctx:null,bus:null,wl:0,node:null,enc:null,fmt:"mp3",dir:null,writer:null,wq:Promise.resolve(),chunks:[],bytes:0,frames:0,rate:44100,pk:0,pkShow:0,peakAll:0,fname:"",doneRes:null,err:null,idle:0,warned:false};
 let RCS={fmt:"mp3",name:"DjApe1_{date}_{time}",auto:0};try{Object.assign(RCS,JSON.parse(localStorage.getItem("mlrec")||"{}"))}catch(e){}
@@ -2508,7 +2510,7 @@ setInterval(()=>{if(REC.state!=="rec")return;recUI();
  if($("rc_t")){$("rc_t").textContent=recT(REC.frames/REC.rate);$("rc_s").textContent=(REC.bytes/1048576).toFixed(1)+" MB";$("rc_m").style.width=(100-REC.pkShow*100)+"%"}
  if(!REC.warned&&!au.paused&&!REC.paused&&REC.frames/REC.rate>6&&REC.peakAll===0){REC.warned=true;toast("⚠ Δεν ανιχνεύεται ήχος στην εγγραφή — αν ακούς μουσική, το αρχείο προέρχεται από άλλη πηγή που δεν μπορεί να καταγραφεί")}
  if(RCS.auto&&au.paused&&!gh){REC.idle+=.4;if(REC.idle>=10){REC.idle=0;recStop()}}else REC.idle=0},400);
-window.addEventListener("beforeunload",e=>{if(REC.state!=="idle"){e.preventDefault();e.returnValue=""}});
+if(!NATIVE)window.addEventListener("beforeunload",e=>{if(REC.state!=="idle"){e.preventDefault();e.returnValue=""}});
 
 /* ---- UI ---- */
 function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.state==="rec",ft=[["mp3","MP3 320 kbps (CBR)"],["flac16","FLAC 16-bit (lossless)"],["flac24","FLAC 24-bit (lossless)"]],direct=(FSA&&REC.dir)||(NW&&RCS.ndir);
