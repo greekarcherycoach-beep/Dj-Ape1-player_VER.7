@@ -1,0 +1,49 @@
+name: Build Windows installer
+
+on:
+  push:
+    tags: ['v*']          # git tag v1.0.0 && git push --tags  -> builds + publishes a Release
+  workflow_dispatch:       # or run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build installer + portable exe
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no code-signing certificate
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dj-Ape1-windows
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Dj-Ape1-Setup-*.exe
+            dist/Dj-Ape1-Portable-*.exe
+          generate_release_notes: true
