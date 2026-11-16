@@ -2389,4 +2389,164 @@ let LAG=0,WEBDIRTY=false,lastWebSave=0;
  if(lag>2500&&NATIVE){try{window.desktop.diag("ui-lag",{ms:Math.round(lag),playing:!au.paused,webLookup:!!webBusy,tracks:T.length})}catch(e){}}},1000)}
 au.addEventListener("pause",()=>{if(WEBDIRTY&&!webBusy){WEBDIRTY=false;renderSoft()}});
 if(NATIVE){window.desktop.getCrash().then(c=>{if(c&&c.crashed)setTimeout(async()=>{try{await restoreLib()}catch(e){}toast("Η εφαρμογή ανέκαμψε από σφάλμα — η βιβλιοθήκη ανακτήθηκε")},900)}).catch(()=>{})}
+
+/* ===== v24: Record (MP3 320 kbps / FLAC) ===== */
+document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#recbtn{white-space:nowrap}#recbtn.on{background:#c62828;color:#fff;border-color:#c62828;animation:recp 1.4s ease-in-out infinite}#recbtn.pz{animation:none;background:#8a6d1a;border-color:#8a6d1a;color:#fff}@keyframes recp{50%{opacity:.62}}.recm{position:relative;height:10px;flex:1;border-radius:99px;overflow:hidden;background:linear-gradient(90deg,#4ade80 0,#4ade80 70%,#facc15 70%,#facc15 90%,#f43f5e 90%)}.recm i{position:absolute;right:0;top:0;bottom:0;width:100%;background:var(--bd);transition:width .08s}"}));
+const REC={state:"idle",paused:false,ctx:null,bus:null,wl:0,node:null,enc:null,fmt:"mp3",dir:null,writer:null,wq:Promise.resolve(),chunks:[],bytes:0,frames:0,rate:44100,pk:0,pkShow:0,peakAll:0,fname:"",doneRes:null,err:null,idle:0,warned:false};
+let RCS={fmt:"mp3",name:"DjApe1_{date}_{time}",auto:0};try{Object.assign(RCS,JSON.parse(localStorage.getItem("mlrec")||"{}"))}catch(e){}
+const saveRCS=()=>{try{localStorage.setItem("mlrec",JSON.stringify(RCS))}catch(e){}};
+const FSA=!NATIVE&&!!window.showDirectoryPicker;
+const NW=!!(NATIVE&&window.desktop&&window.desktop.native&&typeof window.desktop.native.fileOpen==="function"&&typeof window.desktop.native.fileWrite==="function"&&typeof window.desktop.native.fileClose==="function");
+const recT=s=>{s=Math.floor(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,"0");return(h?h+":":"")+p(m)+":"+p(x)};
+if(FSA)idbDo("readonly",st=>st.get("recdir"),"lib").then(r=>{if(r&&r.handle)REC.dir=r.handle}).catch(()=>{});
+
+/* ---- audio graph: the player is routed through Web Audio so everything that is heard (fades, overlaps) can be tapped ---- */
+function recVol(el,g){const d=Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype,"volume");let v=d.get.call(el);d.set.call(el,1);
+ Object.defineProperty(el,"volume",{configurable:true,get:()=>v,set:x=>{v=Math.max(0,Math.min(1,+x||0));try{g.gain.setTargetAtTime(v,REC.ctx.currentTime,.03)}catch(e){g.gain.value=v}}});g.gain.value=v}
+function recRoute(el){const c=REC.ctx,s=c.createMediaElementSource(el),g=c.createGain();s.connect(g);g.connect(REC.bus);recVol(el,g);el.__r=1;
+ if(el!==au)el.addEventListener("pause",()=>{try{g.disconnect()}catch(e){}})}
+async function recInit(){if(REC.ctx)return true;const AC=window.AudioContext||window.webkitAudioContext;if(!AC){toast("Το πρόγραμμα περιήγησης δεν υποστηρίζει Web Audio");return false}
+ let c=new AC({latencyHint:"playback"});
+ if(![44100,48000,32000,22050,24000].includes(c.sampleRate)){try{await c.close()}catch(e){}c=new AC({sampleRate:48000,latencyHint:"playback"})}
+ REC.ctx=c;REC.rate=c.sampleRate;REC.bus=c.createGain();REC.bus.connect(c.destination);
+ if(S.sink&&c.setSinkId){try{await c.setSinkId(S.sink)}catch(e){}}
+ try{if(c.state!=="running")await c.resume()}catch(e){}
+ recRoute(au);c.onstatechange=()=>{if(c.state!=="running")c.resume().catch(()=>{})};return true}
+{const _pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){if(REC.ctx&&this!==au&&!this.__r&&!this.srcObject){try{recRoute(this)}catch(e){}}return _pl.apply(this,arguments)}}
+au.addEventListener("play",()=>{if(REC.ctx&&REC.ctx.state!=="running")REC.ctx.resume().catch(()=>{})});
+try{navigator.mediaDevices.addEventListener("devicechange",()=>{if(REC.ctx&&S.sink&&REC.ctx.setSinkId)REC.ctx.setSinkId(S.sink).catch(()=>{})})}catch(e){}
+
+/* ---- MP3 encoder (lamejs, loaded on demand) ---- */
+let lamePromise=null;
+function recLoadLame(){if(window.lamejs)return Promise.resolve(true);return lamePromise||(lamePromise=new Promise(res=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js";s.onload=()=>res(!!window.lamejs);s.onerror=()=>{lamePromise=null;res(false)};document.head.appendChild(s)}))}
+
+/* ---- FLAC encoder (streaming, fixed predictors + Rice coding, 16 / 24 bit stereo) ---- */
+function flacNew(rate,bps){const N=4096,sc=bps===24?8388607:32767,mn=-sc-1;
+ const T8=new Uint8Array(256),T16=new Uint16Array(256);
+ for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=(c&128)?(((c<<1)^7)&255):((c<<1)&255);T8[i]=c;let d=i<<8;for(let k=0;k<8;k++)d=(d&0x8000)?(((d<<1)^0x8005)&0xFFFF):((d<<1)&0xFFFF);T16[i]=d}
+ const crc8=(a,n)=>{let c=0;for(let i=0;i<n;i++)c=T8[c^a[i]];return c},crc16=(a,n)=>{let c=0;for(let i=0;i<n;i++)c=((c<<8)&0xFFFF)^T16[(c>>8)^a[i]];return c};
+ const bl=new Int32Array(N),br=new Int32Array(N),RB=[0,1,2,3,4].map(()=>new Int32Array(N));let bn=0,fn=0,total=0,minF=0,maxF=0;
+ class BW{constructor(sz){this.b=new Uint8Array(sz);this.p=0;this.c=0;this.n=0}
+  put(v,n){if(!n)return;this.c=(this.c<<n)|(v&((1<<n)-1));this.n+=n;while(this.n>=8){this.n-=8;this.b[this.p++]=(this.c>>>this.n)&255}this.c&=(1<<this.n)-1}
+  align(){if(this.n)this.put(0,8-this.n)}}
+ const utf8n=n=>{if(n<128)return[n];const len=n<2048?2:n<65536?3:n<2097152?4:n<67108864?5:6,out=[];for(let i=len-1;i>0;i--){out.unshift(0x80|(n&63));n=Math.floor(n/64)}out.unshift(((0xFF00>>len)&0xFF)|n);return out};
+ const resid=(o,s,n,r)=>{let sum=0,v;
+  if(o===0){for(let i=0;i<n;i++){v=s[i];r[i]=v;sum+=v<0?-v:v}}
+  else if(o===1){for(let i=1;i<n;i++){v=s[i]-s[i-1];r[i]=v;sum+=v<0?-v:v}}
+  else if(o===2){for(let i=2;i<n;i++){v=s[i]-2*s[i-1]+s[i-2];r[i]=v;sum+=v<0?-v:v}}
+  else if(o===3){for(let i=3;i<n;i++){v=s[i]-3*s[i-1]+3*s[i-2]-s[i-3];r[i]=v;sum+=v<0?-v:v}}
+  else{for(let i=4;i<n;i++){v=s[i]-4*s[i-1]+6*s[i-2]-4*s[i-3]+s[i-4];r[i]=v;sum+=v<0?-v:v}}
+  return sum};
+ const verb=(bw,s,n)=>{bw.put(2,8);for(let i=0;i<n;i++)bw.put(s[i],bps)};
+ const sub=(bw,s,n)=>{let same=true;for(let i=1;i<n;i++)if(s[i]!==s[0]){same=false;break}
+  if(same){bw.put(0,8);bw.put(s[0],bps);return}
+  if(n<=4){verb(bw,s,n);return}
+  let bo=0,bsum=Infinity;for(let o=0;o<=4;o++){const sum=resid(o,s,n,RB[o]);if(sum<bsum){bsum=sum;bo=o}}
+  const r=RB[bo],cnt=n-bo;let sumU=0;for(let i=bo;i<n;i++){const v=r[i];sumU+=((v<<1)^(v>>31))>>>0}
+  const kc=Math.floor(Math.log2(Math.max(1,sumU/cnt)));let bk=0,bb=Infinity;
+  for(let k=Math.max(0,kc-1);k<=Math.min(14,kc+1);k++){let b=cnt*(k+1);for(let i=bo;i<n;i++){const v=r[i];b+=(((v<<1)^(v>>31))>>>0)>>>k}if(b<bb){bb=b;bk=k}}
+  if(!isFinite(bb)||8+bo*bps+10+bb>=8+n*bps){verb(bw,s,n);return}
+  bw.put((8+bo)<<1,8);for(let i=0;i<bo;i++)bw.put(s[i],bps);bw.put(0,2);bw.put(0,4);bw.put(bk,4);
+  for(let i=bo;i<n;i++){const v=r[i],u=((v<<1)^(v>>31))>>>0;let q=u>>>bk;while(q>=24){bw.put(0,24);q-=24}bw.put(1,q+1);if(bk)bw.put(u&((1<<bk)-1),bk)}};
+ const frame=n=>{const hdr=[0xFF,0xF8,((n===N?12:7)<<4),(1<<4)|((bps===24?6:4)<<1)];utf8n(fn).forEach(x=>hdr.push(x));if(n!==N)hdr.push((n-1)>>8,(n-1)&255);hdr.push(crc8(hdr,hdr.length));
+  const bw=new BW(n*2*3+hdr.length+300);for(const x of hdr)bw.b[bw.p++]=x;sub(bw,bl,n);sub(bw,br,n);bw.align();
+  const len=bw.p,c=crc16(bw.b,len);bw.b[len]=c>>8;bw.b[len+1]=c&255;const out=bw.b.slice(0,len+2);fn++;total+=n;if(!minF||out.length<minF)minF=out.length;if(out.length>maxF)maxF=out.length;return out};
+ return{
+  head(){const h=new Uint8Array(42);h.set([0x66,0x4C,0x61,0x43,0x80,0,0,34,N>>8,N&255,N>>8,N&255,minF>>16,(minF>>8)&255,minF&255,maxF>>16,(maxF>>8)&255,maxF&255]);
+   h[18]=rate>>12;h[19]=(rate>>4)&255;h[20]=((rate&15)<<4)|2|((bps-1)>>4);h[21]=(((bps-1)&15)<<4)|(Math.floor(total/4294967296)&15);
+   const lo=total%4294967296;h[22]=(lo>>>24)&255;h[23]=(lo>>>16)&255;h[24]=(lo>>>8)&255;h[25]=lo&255;return h},
+  push(L,R){const out=[],n=L.length;for(let i=0;i<n;i++){const a=L[i]*sc,b=R[i]*sc;bl[bn]=a>sc?sc:a<mn?mn:Math.round(a);br[bn]=b>sc?sc:b<mn?mn:Math.round(b);if(++bn===N){out.push(frame(N));bn=0}}return out},
+  end(){const o=[];if(bn){o.push(frame(bn));bn=0}return o}}}
+
+/* ---- capture ---- */
+const RECW='class P extends AudioWorkletProcessor{constructor(){super();this.n=4096;this.l=new Float32Array(this.n);this.r=new Float32Array(this.n);this.p=0;this.f=0;this.port.onmessage=e=>{if(e.data&&e.data.flush){this.send();this.f=1;this.port.postMessage({done:1})}}}send(){if(!this.p)return;const l=this.l.slice(0,this.p),r=this.r.slice(0,this.p);this.p=0;this.port.postMessage({l,r},[l.buffer,r.buffer])}process(i){if(this.f)return false;const x=i[0];if(!x||!x.length)return true;const a=x[0],b=x[1]||x[0];for(let k=0;k<a.length;k++){this.l[this.p]=a[k];this.r[this.p]=b[k];if(++this.p>=this.n)this.send()}return true}}registerProcessor("dj-rec",P);';
+function recWrite(u8){REC.bytes+=u8.length;if(REC.writer){const w=REC.writer;REC.wq=REC.wq.then(()=>w.write(u8)).catch(e=>{REC.err=e})}else REC.chunks.push(u8)}
+function recChunk(d){if(!d)return;if(d.done){if(REC.doneRes)REC.doneRes();return}if(REC.state==="idle"||!d.l)return;
+ const L=d.l,R=d.r||d.l,n=L.length;let pk=0;for(let i=0;i<n;i++){const a=L[i]<0?-L[i]:L[i],b=R[i]<0?-R[i]:R[i];if(a>pk)pk=a;if(b>pk)pk=b}
+ REC.pk=Math.max(REC.pk,pk);if(pk>REC.peakAll)REC.peakAll=pk;if(REC.paused)return;
+ try{if(REC.fmt==="mp3"){const li=new Int16Array(n),ri=new Int16Array(n);for(let i=0;i<n;i++){const a=Math.round(L[i]*32767),b=Math.round(R[i]*32767);li[i]=a>32767?32767:a<-32768?-32768:a;ri[i]=b>32767?32767:b<-32768?-32768:b}
+   const o=REC.enc.encodeBuffer(li,ri);if(o.length)recWrite(new Uint8Array(o.buffer.slice(o.byteOffset,o.byteOffset+o.byteLength)))}
+  else for(const f of REC.enc.push(L,R))recWrite(f)}
+ catch(e){console.error(e);if(!REC.err){REC.err=e;recStop()}return}
+ REC.frames+=n}
+function recName(){const d=new Date(),p=n=>String(n).padStart(2,"0"),date=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()),time=p(d.getHours())+"-"+p(d.getMinutes())+"-"+p(d.getSeconds());
+ let n=String(RCS.name||"DjApe1_{date}_{time}").replace(/\{date\}/g,date).replace(/\{time\}/g,time).replace(/\{title\}/g,cur?(cur.title||cur.fname||""):"");
+ n=n.replace(/[\\\/:*?"<>|\x00-\x1f]+/g,"_").replace(/\.(mp3|flac)$/i,"").trim().replace(/[. ]+$/,"");return n||"DjApe1_"+date+"_"+time}
+async function recUnique(dir,name){const m=/^(.*)(\.[^.]+)$/.exec(name),b=m[1],e=m[2];let n=name,i=1;for(;;){try{await dir.getFileHandle(n);i++;n=`${b} (${i})${e}`;if(i>999)return n}catch(x){return n}}}
+function recDownload(name,parts,mime){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(parts,{type:mime}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},60000)}
+async function recStart(){if(REC.state!=="idle")return;
+ if(S.hifi){toast("Ο Audiophile mode είναι ενεργός — απενεργοποίησέ τον για να κάνεις εγγραφή");return}
+ const fmt=RCS.fmt;if(!await recInit())return;
+ if(fmt==="mp3"&&!await recLoadLame()){toast("Δεν φορτώθηκε ο κωδικοποιητής MP3 (χρειάζεται internet) — δοκίμασε FLAC");return}
+ let name=recName()+(fmt==="mp3"?".mp3":".flac");REC.writer=null;REC.chunks=[];
+ if(NW&&RCS.ndir){try{const n=window.desktop.native,o=await n.fileOpen(RCS.ndir,name);name=o.name||name;const id=o.id;REC.writer={write:async x=>{if(x instanceof Uint8Array)await n.fileWrite(id,x,null);else await n.fileWrite(id,x.data,x.position)},close:()=>n.fileClose(id)}}catch(e){toast("Δεν ήταν δυνατή η δημιουργία του αρχείου στον φάκελο");return}}
+ else if(FSA&&REC.dir){try{let p=await REC.dir.queryPermission({mode:"readwrite"});if(p!=="granted")p=await REC.dir.requestPermission({mode:"readwrite"});
+   if(p!=="granted"){toast("Δεν δόθηκε άδεια εγγραφής στον φάκελο");return}
+   name=await recUnique(REC.dir,name);const fh=await REC.dir.getFileHandle(name,{create:true});REC.writer=await fh.createWritable()}
+  catch(e){toast("Δεν ήταν δυνατή η δημιουργία του αρχείου στον φάκελο");return}}
+ const c=REC.ctx;let node=null;
+ try{if(!REC.wl){await c.audioWorklet.addModule(URL.createObjectURL(new Blob([RECW],{type:"application/javascript"})));REC.wl=1}
+  node=new AudioWorkletNode(c,"dj-rec",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:"explicit"});node.port.onmessage=e=>recChunk(e.data)}
+ catch(e){node=c.createScriptProcessor(4096,2,2);node.onaudioprocess=ev=>{const b=ev.inputBuffer;recChunk({l:b.getChannelData(0).slice(),r:b.getChannelData(Math.min(1,b.numberOfChannels-1)).slice()})}}
+ REC.fmt=fmt;REC.fname=name;REC.bytes=0;REC.frames=0;REC.pk=0;REC.pkShow=0;REC.peakAll=0;REC.paused=false;REC.warned=false;REC.idle=0;REC.wq=Promise.resolve();REC.err=null;REC.rate=c.sampleRate;
+ if(fmt==="mp3")REC.enc=new lamejs.Mp3Encoder(2,REC.rate,320);else{REC.enc=flacNew(REC.rate,fmt==="flac24"?24:16);recWrite(REC.enc.head())}
+ REC.node=node;REC.bus.connect(node);node.connect(c.destination);REC.state="rec";recUI();toast("⏺ Η εγγραφή ξεκίνησε: "+name)}
+async function recStop(){if(REC.state!=="rec")return;REC.state="stop";recUI();const n=REC.node;
+ await new Promise(res=>{let d=false;const f=()=>{if(!d){d=true;res()}};REC.doneRes=f;try{if(n.port)n.port.postMessage({flush:1});else f()}catch(e){f()}setTimeout(f,1000)});
+ try{REC.bus.disconnect(n)}catch(e){}try{n.disconnect()}catch(e){}try{n.onaudioprocess=null}catch(e){}REC.node=null;
+ let ok=true;
+ try{if(REC.fmt==="mp3"){const o=REC.enc.flush();if(o&&o.length)recWrite(new Uint8Array(o.buffer.slice(o.byteOffset,o.byteOffset+o.byteLength)))}
+  else{for(const f of REC.enc.end())recWrite(f);const h=REC.enc.head();if(REC.writer){await REC.wq;await REC.writer.write({type:"write",position:0,data:h})}else REC.chunks[0]=h}
+  await REC.wq;if(REC.err)throw REC.err;
+  if(REC.writer)await REC.writer.close();else recDownload(REC.fname,REC.chunks,REC.fmt==="mp3"?"audio/mpeg":"audio/flac")}
+ catch(e){ok=false;console.error(e);try{if(REC.writer)await REC.writer.close()}catch(x){}toast("⚠ Σφάλμα αποθήκευσης εγγραφής: "+(e&&e.message||e))}
+ const nm=REC.fname,mb=(REC.bytes/1048576).toFixed(1);REC.enc=null;REC.chunks=[];REC.writer=null;REC.state="idle";REC.paused=false;recUI();
+ if(ok)toast(`✅ Η εγγραφή αποθηκεύτηκε: ${nm} (${mb} MB)`)}
+function recUI(){const b=$("recbtn");if(!b)return;const on=REC.state!=="idle";b.classList.toggle("on",on&&!REC.paused);b.classList.toggle("pz",on&&REC.paused);b.textContent=on?(REC.paused?"⏸ ":"⏺ ")+recT(REC.frames/REC.rate):"⏺"}
+setInterval(()=>{if(REC.state!=="rec")return;recUI();
+ const lvl=REC.pk>0?Math.max(0,Math.min(1,(20*Math.log10(REC.pk)+60)/60)):0;REC.pk=0;REC.pkShow=Math.max(lvl,REC.pkShow*.6);
+ if($("rc_t")){$("rc_t").textContent=recT(REC.frames/REC.rate);$("rc_s").textContent=(REC.bytes/1048576).toFixed(1)+" MB";$("rc_m").style.width=(100-REC.pkShow*100)+"%"}
+ if(!REC.warned&&!au.paused&&!REC.paused&&REC.frames/REC.rate>6&&REC.peakAll===0){REC.warned=true;toast("⚠ Δεν ανιχνεύεται ήχος στην εγγραφή — αν ακούς μουσική, το αρχείο προέρχεται από άλλη πηγή που δεν μπορεί να καταγραφεί")}
+ if(RCS.auto&&au.paused&&!gh){REC.idle+=.4;if(REC.idle>=10){REC.idle=0;recStop()}}else REC.idle=0},400);
+window.addEventListener("beforeunload",e=>{if(REC.state!=="idle"){e.preventDefault();e.returnValue=""}});
+
+/* ---- UI ---- */
+function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.state==="rec",ft=[["mp3","MP3 320 kbps (CBR)"],["flac16","FLAC 16-bit (lossless)"],["flac24","FLAC 24-bit (lossless)"]],direct=(FSA&&REC.dir)||(NW&&RCS.ndir);
+ const dirTxt=NW?(RCS.ndir?"📁 "+esc(RCS.ndir):"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει στον φάκελο Λήψεων"):FSA?(REC.dir?"📁 "+esc(REC.dir.name):"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει από τον browser"):"Το αρχείο θα κατέβει στον φάκελο Λήψεων";
+ m.innerHTML=`<div class="mc" style="max-width:560px"><div class="mh"><h2>⏺ Εγγραφή</h2><button class="x">×</button></div>
+ <p class="mu" style="margin:6px 0 12px">Καταγράφει ό,τι παίζει το πρόγραμμα, μαζί με τις μεταβάσεις και τα crossfade του Dj mode. Μπορείς να πατήσεις Έναρξη και μετά Play.</p>
+ ${on?`<div class="gbig"><div class="mr"><span class="ell">Διάρκεια</span><b id="rc_t">00:00</b></div><div class="mr"><span class="ell">Μέγεθος</span><b id="rc_s">0.0 MB</b></div><div class="mr"><span class="ell">Αρχείο</span><span class="ell" style="flex:2;text-align:right">${esc(REC.fname)}</span></div><div class="mr"><span class="ell">Στάθμη</span><div class="recm"><i id="rc_m"></i></div></div></div>`:""}
+ <label class="mr"><span class="ell">Μορφή</span><select id="rc_f" ${on?"disabled":""}>${ft.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></label>
+ <label class="fld"><span class="mu">Όνομα αρχείου</span><input id="rc_n" value="${esc(RCS.name)}" ${on?"disabled":""}></label>
+ <p class="mu" style="margin:-4px 0 8px;font-size:12px"><span>Μεταβλητές:</span> {date} · {time} · {title} &nbsp;→&nbsp; <b id="rc_pv"></b></p>
+ <div class="mr"><span class="ell" id="rc_dn">${dirTxt}</span><button class="sm" id="rc_d" ${on?"disabled":""}>Επιλογή φακέλου…</button></div>
+ <label class="mr"><input type="checkbox" id="rc_a" ${RCS.auto?"checked":""}><span class="ell">Αυτόματη διακοπή όταν σταματήσει η αναπαραγωγή για 10΄΄</span></label>
+ <p class="mu" style="font-size:12px">Μέγεθος ανά ώρα: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB.${direct?"":" Χωρίς επιλογή φακέλου το αρχείο κρατιέται στη μνήμη μέχρι να σταματήσεις την εγγραφή."}</p>
+ <div class="mt">${on?`<button class="big" id="rc_stop" style="background:#c62828;padding:10px 22px;font-size:15px">⏹ Διακοπή &amp; αποθήκευση</button><button class="sm" id="rc_p">${REC.paused?"▶ Συνέχεια":"⏸ Παύση"}</button>`:`<button class="big" id="rc_go" style="background:#c62828;padding:10px 22px;font-size:15px">⏺ Έναρξη εγγραφής</button>`}</div></div>`;
+ $("rc_f").value=RCS.fmt;
+ const rd=()=>{RCS.fmt=$("rc_f").value;RCS.name=$("rc_n").value.trim()||"DjApe1_{date}_{time}";RCS.auto=$("rc_a").checked?1:0;saveRCS()},pv=()=>{const e=$("rc_pv");if(e)e.textContent=recName()+(RCS.fmt==="mp3"?".mp3":".flac")};pv();
+ m.onchange=m.oninput=e=>{if(e.target.id&&e.target.id.startsWith("rc_")){rd();pv()}};
+ m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const id=e.target.id;
+  if(id==="rc_d"&&NW){try{const pth=await window.desktop.native.pickFolder();if(pth){RCS.ndir=pth;saveRCS();recModal()}}catch(x){}}
+  else if(id==="rc_d"){if(!FSA){toast("Η επιλογή φακέλου απαιτεί Chrome ή Edge (στην desktop εφαρμογή το αρχείο κατεβαίνει στον φάκελο Λήψεων)");return}
+   try{const h=await showDirectoryPicker({mode:"readwrite",id:"djape1rec"});REC.dir=h;try{await idbDo("readwrite",st=>st.put({id:"recdir",handle:h}),"lib")}catch(x){}recModal()}catch(x){}}
+  else if(id==="rc_go"){rd();m.classList.add("hide");await recStart()}
+  else if(id==="rc_stop"){m.classList.add("hide");await recStop()}
+  else if(id==="rc_p"){REC.paused=!REC.paused;recUI();recModal()}};}
+{const tp=document.querySelector(".top .topr"),b=document.createElement("button");b.className="sm";b.id="recbtn";b.textContent="⏺";b.title="Εγγραφή (MP3 320 / FLAC)";b.onclick=()=>recModal();const mb=$("minibtn");tp.insertBefore(b,mb||null)}
+/* English strings */
+Object.assign(EXACT,{"Εγγραφή (MP3 320 / FLAC)":"Record (MP3 320 / FLAC)","⏺ Εγγραφή":"⏺ Record",
+"Καταγράφει ό,τι παίζει το πρόγραμμα, μαζί με τις μεταβάσεις και τα crossfade του Dj mode. Μπορείς να πατήσεις Έναρξη και μετά Play.":"Records whatever the program plays, including the Dj mode transitions and crossfades. You can press Start first and then Play.",
+"Στάθμη":"Level","Όνομα αρχείου":"File name","Μεταβλητές:":"Variables:","Επιλογή φακέλου…":"Choose folder…",
+"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει από τον browser":"No folder chosen — the file will be downloaded by the browser","Το αρχείο θα κατέβει στον φάκελο Λήψεων":"The file will be saved to the Downloads folder",
+"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει στον φάκελο Λήψεων":"No folder chosen — the file will be saved to the Downloads folder","Αυτόματη διακοπή όταν σταματήσει η αναπαραγωγή για 10΄΄":"Stop automatically when playback stops for 10 s",
+"⏺ Έναρξη εγγραφής":"⏺ Start recording","⏹ Διακοπή & αποθήκευση":"⏹ Stop & save","⏸ Παύση":"⏸ Pause","▶ Συνέχεια":"▶ Resume",
+"Μέγεθος ανά ώρα: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB.":"Size per hour: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB.",
+"Μέγεθος ανά ώρα: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB. Χωρίς επιλογή φακέλου το αρχείο κρατιέται στη μνήμη μέχρι να σταματήσεις την εγγραφή.":"Size per hour: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB. Without a chosen folder the file is kept in memory until you stop recording.",
+"Ο Audiophile mode είναι ενεργός — απενεργοποίησέ τον για να κάνεις εγγραφή":"Audiophile mode is on — turn it off to record","Το πρόγραμμα περιήγησης δεν υποστηρίζει Web Audio":"This browser does not support Web Audio",
+"Δεν φορτώθηκε ο κωδικοποιητής MP3 (χρειάζεται internet) — δοκίμασε FLAC":"The MP3 encoder could not be loaded (internet needed) — try FLAC","Δεν δόθηκε άδεια εγγραφής στον φάκελο":"Write permission for the folder was not granted",
+"Δεν ήταν δυνατή η δημιουργία του αρχείου στον φάκελο":"The file could not be created in the folder","Η επιλογή φακέλου απαιτεί Chrome ή Edge (στην desktop εφαρμογή το αρχείο κατεβαίνει στον φάκελο Λήψεων)":"Folder selection requires Chrome or Edge (in the desktop app the file goes to the Downloads folder)",
+"⚠ Δεν ανιχνεύεται ήχος στην εγγραφή — αν ακούς μουσική, το αρχείο προέρχεται από άλλη πηγή που δεν μπορεί να καταγραφεί":"⚠ No audio detected in the recording — if you hear music, the file comes from a source that cannot be captured"});
+PAT.push([/^⏺ Η εγγραφή ξεκίνησε: ([\s\S]*)$/,"⏺ Recording started: $1"],[/^✅ Η εγγραφή αποθηκεύτηκε: ([\s\S]*)$/,"✅ Recording saved: $1"],[/^⚠ Σφάλμα αποθήκευσης εγγραφής: ([\s\S]*)$/,"⚠ Error saving the recording: $1"]);
+
 </script></body></html>
