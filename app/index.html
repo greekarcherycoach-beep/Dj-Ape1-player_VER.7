@@ -236,6 +236,8 @@ body.compact .trow{min-height:34px}body.compact .tc{padding:3px 10px}body.compac
 @media(max-width:900px){#vizmini{display:none}}
 #vizprev{width:100%;height:96px;border:1px solid var(--bd);border-radius:10px;background:var(--bg)}
 .mr input[type=range]{width:150px;accent-color:var(--ac)}
+.wz-tl{display:flex;gap:3px;margin:8px 0;overflow-x:auto}.tlb{min-width:54px;border-radius:8px;padding:6px 8px;color:#fff;font-size:12px;line-height:1.25;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;min-height:48px}.tlb[draggable]{cursor:grab}.tlb b,.tlb small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.ez-pr{display:flex;gap:5px;margin:6px 0}.ez-pr i{flex:1;height:6px;border-radius:9px;background:var(--bd)}.ez-pr i.on{background:var(--ac)}.ezg{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:12px 0}.ezt{background:var(--bg);border:2px solid var(--bd);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font-size:15px;margin-bottom:8px}.ezt.on{border-color:var(--ac);background:var(--ac2)}.ezt b{display:block;font-size:17px;margin-bottom:2px}.ezt small{color:var(--mu);display:block;font-size:13px;margin-bottom:6px}.ez-h{font-size:22px;margin:12px 0 4px}.ez-nav{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
 </style></head><body>
 
 <div id="welcome">
@@ -2052,6 +2054,7 @@ const WZT={"2h":["Κλασικό 2 ωρών",[["Warm-up",30,3,5,"auto"],["Build-
 const tplPh=k=>WZT[k][1].map(([name,min,e0,e1,key,g,b1,b2,mx])=>({name,min,e0,e1,key,g:g||"",b1:b1||0,b2:b2||0,mx:mx||"auto"}));
 WZT.mega=["Πολύωρο ταξίδι 5ω40΄ (chill → techno → reggae → rock)",[["Warm-up",20,2,3,"auto","chill",80,112,"blend"],["Build-up",40,4,6,"auto","progressive",118,126,"smooth"],["Peak",50,8,9,"hold","techno",128,140,"club"],["Cool-down",20,6,4,"auto","deep house",118,124,"smooth"],["Build dub",40,4,6,"auto","dub",60,100,"smooth"],["Reggae",140,5,7,"auto","reggae",60,100,"smooth"],["Γέφυρα rock",30,6,8,"auto","rock",90,150,"fade"]]];
 WZT.genres4=["Ταξίδι ειδών 4ω (chill → deep → tech → techno)",[["Chill",30,2,3,"auto","chill",80,112,"blend"],["Deep house",50,4,6,"auto","deep house",118,124,"smooth"],["Tech house",60,6,8,"auto","tech house",122,128,"smooth"],["Techno peak",60,8,9,"hold","techno",128,140,"club"],["Outro",40,7,3,"auto","deep house",118,124,"blend"]]];
+WZT.reggae=["Reggae/Dub → House",[["Reggae / Dub",60,4,6,"auto","reggae, dub",60,100,"smooth"],["Deep house",40,5,7,"auto","deep house",118,124,"smooth"],["Tech house",50,7,8,"auto","tech house",122,128,"club"],["Techno peak",50,8,9,"hold","techno",128,140,"club"],["Cool-down",40,7,4,"auto","deep house",118,124,"blend"]]];
 /* per-phase mix style: used instead of the general transition settings when a phase picks one */
 const MXS={blend:{n:"Μακρύ blend 16΄΄ (chill / deep)",fout:16,fin:12,ov:true,smart:true},smooth:{n:"Smooth crossfade 8΄΄",fout:8,fin:6,ov:true,smart:true},
  club:{n:"Tight beatmix 4΄΄ (house / techno)",fout:4,fin:3,ov:true,smart:true},cut:{n:"Γρήγορο cut 1΄΄ (rock / dub)",fout:1,fin:.5,ov:true,smart:false},
@@ -2087,6 +2090,8 @@ function planSet(pool,cfg){const rnd=cfg.rand||Math.random,now=Date.now(),ph=(cf
  const lowS2=x=>String(x==null?"":x).toLowerCase(),ak=t=>lowS2(t.artist),total=ph.reduce((a,p)=>a+p.min*60,0),marks=[];let acc=0;ph.forEach((p,i)=>{marks.push({i,p,s:acc,e:acc+p.min*60});acc+=p.min*60});
  const at=s=>marks.find(m=>s<m.e)||marks[marks.length-1],tgt=s=>{const m=at(s),k=Math.max(0,Math.min(1,(s-m.s)/(m.e-m.s)));return m.p.e0+(m.p.e1-m.p.e0)*k},
   bpmT=(e,p)=>{const b1=p&&p.b1||cfg.b1,b2=p&&p.b2||cfg.b2;return b1+(b2-b1)*Math.max(0,Math.min(1,(e-1)/9))},en=cfg.energy,est=cfg.est||new Set(),jump=+cfg.jump||6,wE=cfg.wE||11,rz=cfg.rz==null?4:+cfg.rz,gap=cfg.gap==null?3:+cfg.gap,maxA=+cfg.maxA||0;
+ const ht=!!cfg.ht,bIn=(b,lo,hi)=>bpmIn(b,lo,hi,ht),bnear=(a,b)=>{let v=b;if(ht)for(const x of[b*2,b/2])if(Math.abs(a-x)<Math.abs(a-v))v=x;return v},bdist=(a,b)=>Math.abs(a-bnear(a,b)),fixQ=new Map(),mustPh=new Map();let br=null;
+ if(cfg.fixed)cfg.fixed.forEach((a,k)=>{fixQ.set(k,a.slice());a.forEach(t=>mustPh.set(t,k))});if(cfg.must)cfg.must.forEach((k,t)=>mustPh.set(t,k));
  let left=pool.filter(t=>camP(t.cam)&&en.has(t)),sumD=0;left.forEach(t=>sumD+=t.dur||300);const avgD=left.length?sumD/left.length:300,
   startN=cfg.startKey?camP(cfg.startKey):null;
  const mix=[],items=[],cnt=new Map(),warn=[],fbG=new Set(),fbB=new Set();let tot=0,last=null,kpos=startN?startN.n:8,prevT=null,prevS=0,sinceSw=99;
@@ -2096,35 +2101,46 @@ function planSet(pool,cfg){const rnd=cfg.rand||Math.random,now=Date.now(),ph=(cf
   prevT=et;prevS=sec;const tn=((Math.round(kpos)-1)%12+12)%12+1,moodNow=!!(cfg.mood&&last&&sinceSw>=(cfg.moodGap||6)&&rnd()<.45),
    recent=new Set(gap?mix.slice(-gap).map(ak).filter(Boolean):[]);
   const gt=gTerms(phs.g),pb1=+phs.b1||0,pb2=+phs.b2||0,lpI=items.length?items[items.length-1].ph:-1,pch=lpI>=0&&marks[lpI].p!==phs&&((marks[lpI].p.g||"")!==(phs.g||"")||(marks[lpI].p.b1||0)!==pb1||(marks[lpI].p.b2||0)!==pb2);
-  const pick=(lvl,md)=>{let best=null,bs=-1e9,bm=null;for(const c of left){if(md<2&&gt.length&&!gMatch(c,gt))continue;if(md<1&&c.bpm&&((pb1&&c.bpm<pb1)||(pb2&&c.bpm>pb2)))continue;const a=ak(c);if(maxA&&a&&(cnt.get(a)||0)>=maxA)continue;const e=en.get(c),de=Math.abs(e-et),cp=camP(c.cam),mv=last?camMove(last.cam,c.cam):{k:"same"};
+  const curPh=at(sec).i,mustL=left.filter(c=>mustPh.get(c)<=curPh),forceMust=mustL.length>0&&marks[curPh].e-tot<=mustL.reduce((a,c)=>a+(c.dur||300),0)+avgD*.6;
+  if(cfg.bridge&&last&&last.bpm&&!(fixQ.get(curPh)||[]).length&&items.length&&items[items.length-1].ph!==curPh&&!(br&&br.ph===curPh)){const goal=bpmT(et,phs),from=bnear(goal,last.bpm),d=Math.abs(goal-from);if(d>=(+cfg.brMin||14))br={ph:curPh,i:0,n:d>=36?3:2,from,goal}}
+  const brk=!!br&&br.i<br.n;if(brk)br.tb=br.from+(br.goal-br.from)*(br.i+1)/(br.n+1);
+  const pick=(lvl,md)=>{let best=null,bs=-1e9,bm=null;for(const c of left){const mp=mustPh.get(c),mine=mp!==undefined&&mp<=curPh;if(mp!==undefined&&!mine)continue;if(forceMust&&!mine)continue;if(md<2&&!brk&&gt.length&&!gMatch(c,gt))continue;if(md<1&&!brk&&c.bpm&&!bIn(c.bpm,pb1,pb2))continue;const a=ak(c);if(maxA&&a&&(cnt.get(a)||0)>=maxA)continue;const e=en.get(c),de=Math.abs(e-et),cp=camP(c.cam),mv=last?camMove(last.cam,c.cam):{k:"same"};
     if(lvl===0&&(mv.k==="clash"||de>3))continue;if(lvl===1&&(mv.k==="clash"||de>4.5))continue;
     let s=MV[mv.k]||0;if(moodNow&&mv.k==="switch")s+=28;else if(mv.k==="switch")s-=6;
     const dn=Math.min((cp.n-tn+12)%12,(tn-cp.n+12)%12);s+=dn===0?18:dn===1?6:dn===2?-6:-dn*5;
     s-=de*wE+(de>2.5?(de-2.5)*12:0);if(est.has(c))s-=6;
-    if(last&&last.bpm&&c.bpm){const g=Math.abs(last.bpm-c.bpm),lim=jump*(lvl===0?1:lvl===1?1.6:99);if(!pch)s-=g>lim?40+g*3:g*1.2}
-    if(c.bpm)s-=Math.abs(c.bpm-bpmT(et,phs))*.35;
+    if(last&&last.bpm&&c.bpm){const g=bdist(last.bpm,c.bpm),lim=jump*(lvl===0?1:lvl===1?1.6:99);if(!pch&&!brk)s-=g>lim?40+g*3:g*1.2}
+    if(c.bpm&&!brk)s-=bdist(bpmT(et,phs),c.bpm)*.35;if(brk&&c.bpm)s-=bdist(br.tb,c.bpm)*1.6;if(mine)s+=50;
     if(last)s+=mixScore(last,c,true)*.25;
     if(a&&recent.has(a))s-=25;if(cfg.recent&&c.last&&now-c.last<432e5)s-=12;
     if(!last&&startN)s+=dn===0&&cp.l===startN.l?10:0;
     s+=rnd()*rz;if(s>bs){bs=s;best=c;bm=mv}}return best?{c:best,mv:bm}:null};
-  let r=null,fbm=0;for(let md=0;md<3&&!r;md++){r=pick(0,md)||pick(1,md)||pick(2,md);fbm=md}if(!r)break;if(fbm===1&&(pb1||pb2))fbB.add(at(sec).i);if(fbm===2&&gt.length)fbG.add(at(sec).i);const c=r.c,mv=r.mv,cp=camP(c.cam);
-  items.push({t:c,start:tot,mid:tot+(c.dur||300)/2,ph:at(tot+1).i,mv,e:en.get(c),et,dbpm:last&&last.bpm&&c.bpm?Math.round((c.bpm-last.bpm)*10)/10:0,
+  let r=null,fbm=0,fx=null,fxp=curPh;for(const k of[...fixQ.keys()].sort((a,b)=>a-b)){const q=fixQ.get(k);if(k<=curPh&&q.length){const c0=q.shift();if(left.includes(c0)){fx=c0;fxp=k}break}}
+  if(fx)r={c:fx,mv:last?camMove(last.cam,fx.cam):{k:"same"}};else for(let md=0;md<3&&!r;md++){r=pick(0,md)||pick(1,md)||pick(2,md);fbm=md}if(!r)break;if(fbm===1&&(pb1||pb2))fbB.add(at(sec).i);if(fbm===2&&gt.length)fbG.add(at(sec).i);const c=r.c,mv=r.mv,cp=camP(c.cam);
+  items.push({t:c,start:tot,mid:tot+(c.dur||300)/2,ph:fx?fxp:at(tot+1).i,br:brk&&!fx,mv,e:en.get(c),et,dbpm:last&&last.bpm&&c.bpm?Math.round((c.bpm-last.bpm)*10)/10:0,
    score:last?mixScore(last,c,true):null,est:est.has(c)});
   if(Math.abs(cp.n-Math.round(kpos))>=2)kpos=cp.n;
-  sinceSw=mv.k==="switch"?0:sinceSw+1;cnt.set(ak(c),(cnt.get(ak(c))||0)+1);mix.push(c);tot+=c.dur||300;left.splice(left.indexOf(c),1);last=c}
+  if(brk&&!fx)br.i++;sinceSw=mv.k==="switch"?0:sinceSw+1;cnt.set(ak(c),(cnt.get(ak(c))||0)+1);mix.push(c);tot+=c.dur||300;left.splice(left.indexOf(c),1);last=c}
  if(tot<total*.85)warn.push(`Το σετ βγήκε ${Math.round(tot/60)}΄ αντί για ${Math.round(total/60)}΄ — δεν υπάρχουν αρκετά τραγούδια που να ταιριάζουν. Διεύρυνε το εύρος BPM, το είδος ή ανάλυσε περισσότερα τραγούδια.`);
  marks.forEach(m=>{const p=m.p;if(fbG.has(m.i))warn.push(`Φάση «${p.name}»: δεν βρέθηκαν αρκετά τραγούδια με είδος «${p.g}» — συμπληρώθηκε με άλλα είδη.`);if(fbB.has(m.i))warn.push(`Φάση «${p.name}»: δεν υπήρχαν αρκετά τραγούδια στο εύρος BPM ${p.b1||"…"}–${p.b2||"…"} — χαλάρωσα το εύρος.`)});
- const phases=marks.map(m=>{const it=items.filter(x=>x.ph===m.i);return{name:m.p.name,g:m.p.g||"",mx:m.p.mx||"auto",min:m.p.min,s:m.s,e:m.e,n:it.length,key:m.p.key,
-  avgE:it.length?it.reduce((a,x)=>a+x.e,0)/it.length:0,avgT:it.length?it.reduce((a,x)=>a+x.et,0)/it.length:0,keys:it.map(x=>x.t.cam)}});
- const sc=items.filter(x=>x.score!=null).map(x=>x.score);
- return{mix,items,marks,phases,total,tot,warn,avg:sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):0,
-  moves:items.reduce((o,x)=>(o[x.mv.k]=(o[x.mv.k]||0)+1,o),{})}}
+ return planFin({items,marks,total,warn,ht})}
+function planFin(r){const it=r.items;let t=0,pv=null;
+ it.forEach(x=>{x.start=t;x.mid=t+(x.t.dur||300)/2;if(pv){x.mv=camMove(pv.t.cam,x.t.cam);x.score=mixScore(pv.t,x.t,true);const d=bdiffH(pv.t.bpm,x.t.bpm,r.ht);x.dbpm=d.d;x.bx=d.v}else{x.mv={k:"same"};x.score=null;x.dbpm=0;x.bx=x.t.bpm}t+=x.t.dur||300;pv=x});
+ r.mix=it.map(x=>x.t);r.tot=t;
+ r.phases=r.marks.map(m=>{const q=it.filter(x=>x.ph===m.i);return{name:m.p.name,g:m.p.g||"",mx:m.p.mx||"auto",min:m.p.min,s:m.s,e:m.e,n:q.length,key:m.p.key,avgE:q.length?q.reduce((a,x)=>a+x.e,0)/q.length:0,avgT:q.length?q.reduce((a,x)=>a+x.et,0)/q.length:0,keys:q.map(x=>x.t.cam)}});
+ const sc=it.filter(x=>x.score!=null).map(x=>x.score);r.avg=sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):0;
+ r.moves=it.reduce((o,x)=>(o[x.mv.k]=(o[x.mv.k]||0)+1,o),{});return r}
+const bdiffH=(a,b,ht)=>{if(!a||!b)return{d:0,v:b};let v=b;if(ht)for(const x of[b*2,b/2])if(Math.abs(a-x)<Math.abs(a-v))v=x;return{d:Math.round((v-a)*10)/10,v}};
+const bpmIn=(b,lo,hi,ht)=>[b,...(ht?[b*2,b/2]:[])].some(x=>(!lo||x>=lo)&&(!hi||x<=hi));
+const clk=(st,sec)=>{if(!st)return"";const q=String(st).split(":").map(Number),t=((q[0]*60+(q[1]||0))+Math.floor(sec/60))%1440;return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
+const PHC=i=>`hsl(${(i*47+12)%360} 55% 40%)`;
+function tlHTML(P,st,o){let s=0;return`<div class="wz-tl">`+P.map((p,k)=>{const t0=s*60;s+=p.min;return`<div class="tlb"${o&&o.drag?` draggable="true" data-i="${k}"`:""} style="flex:${p.min} 1 0;background:${PHC(k)}" title="${esc(p.name)} · ${p.min}΄"><b>${st?clk(st,t0)+" ":""}${esc(p.name)}</b><small>${p.min}΄${p.lt?" "+p.lt:""}${p.lk?" 🔒":""}</small></div>`}).join("")+`</div>`}
 
 /* --- UI --- */
 const MVL={same:"ίδιο key",  "+1":"+1 ανέβασμα","-1":"−1 κατέβασμα","+-2":"±2 (ρίσκο)",diag:"διαγώνια (ρίσκο)",clash:"⚠ clash",unk:"—",switchup:"mood switch ▲ major",switchdown:"mood switch ▼ minor"};
 const mvLabel=mv=>mv.k==="switch"?MVL["switch"+mv.dir]:MVL[mv.k];
 const hms=s=>{s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,"0");return(h?h+":":"")+p(m)+":"+p(x)};
-const WZ={skip:false,phases:null,last:null};
+const newLk=()=>({ph:new Set(),tr:new Set()}),WZ={skip:false,phases:null,last:null,lk:newLk(),st:"",ctx:null,drag:null,alts:null};
 function wzChart(r){const W=680,H=190,L=30,R=8,Tp=10,B=26,pw=W-L-R,ph=H-Tp-B,X=s=>L+pw*Math.min(1,s/r.total),Y=e=>Tp+ph*(1-(e-1)/9);let g="";
  r.marks.forEach((m,i)=>{g+=`<rect x="${X(m.s)}" y="${Tp}" width="${X(m.e)-X(m.s)}" height="${ph}" style="fill:var(--tx);opacity:${i%2?.04:.09}"/><text x="${(X(m.s)+X(m.e))/2}" y="${H-9}" text-anchor="middle" style="fill:var(--mu);font-size:11px">${esc(m.p.name)} · ${m.p.min}΄</text>`});
  [1,4,7,10].forEach(e=>{g+=`<line x1="${L}" x2="${W-R}" y1="${Y(e)}" y2="${Y(e)}" style="stroke:var(--bd)"/><text x="${L-5}" y="${Y(e)+4}" text-anchor="end" style="fill:var(--mu);font-size:10px">${e}</text>`});
@@ -2143,12 +2159,16 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
   <label class="fld"><span class="mu">Στυλ</span><select id="wz_sty">${opt(Object.entries(WZS).map(([k,v])=>[k,v.n+(k==="custom"?"":k==="techno"?` · ${v.b1}+ BPM`:` · ${v.b1}–${v.b2} BPM`)]),st)}</select></label>
   <p class="mu" id="wz_note" style="margin:0 0 10px">${S0.note}</p>
   <div class="rrow"><span class="mu">BPM</span><input id="wz_b1" type="number" value="${sv.b1||S0.b1}" style="width:70px"><span class="mu">έως</span><input id="wz_b2" type="number" value="${sv.b2||S0.b2}" style="width:70px"><span class="mu">Μέγιστο άλμα BPM ανά μετάβαση</span><select id="wz_j">${opt([2,3,4,6,8,10].map(v=>[v,"±"+v]),sv.jump||S0.j)}</select></div>
+  <label class="rrow"><input type="checkbox" id="wz_ht"${sv.ht?" checked":""}> ½× / 2× BPM — το 70 θεωρείται ίσο με 140 (και το 65 με 130): μετάβαση από dub/reggae σε house/techno χωρίς απότομο άλμα</label>
   <label class="fld"><span class="mu">Πηγή</span><select id="wz_src"><option value="">Ολόκληρη η βιβλιοθήκη</option>${PL.map(x=>`<option value="${x.id}"${x.id===selPL?" selected":""}>${x.smart?"✨":"🎶"} ${esc(x.name)}</option>`).join("")}</select></label>
   <p class="mu" style="margin:0 0 6px;font-size:12px">Τα είδη ανά φάση ορίζονται στο βήμα 2 — εδώ άφησε κενό εκτός αν θέλεις να περιορίσεις ολόκληρη τη βιβλιοθήκη. Το εύρος BPM εδώ ισχύει για φάσεις χωρίς δικό τους εύρος.</p>${ddHTML("wz_g")}<p id="wz_cnt" class="mu"></p></div>
  <div class="wz-s hide" data-n="2">
   <div class="rrow"><select id="wz_tpl">${opt(Object.entries(WZT).map(([k,v])=>[k,v[0]]),"2h")}</select><button class="sm" data-a="tpl">Εφαρμογή προτύπου</button><button class="sm" data-a="addph">➕ Φάση</button><span class="mu" id="wz_tot"></span></div>
-  <p class="mu" style="font-size:12px;margin:0 0 8px">Ανά φάση: διάρκεια, ενέργεια, <b>είδος</b> (πολλά με κόμμα· ταιριάζει και μερικό όνομα, π.χ. «house»), <b>εύρος BPM</b> (κενό = γενικό) και <b>τρόπος μίξης</b>. Οι κανόνες Camelot και η καμπύλη ενέργειας ισχύουν σε όλες τις φάσεις· στις αλλαγές είδους δεν τιμωρείται το άλμα BPM.</p><datalist id="wz_gl">${[...new Set(T.flatMap(t=>t.genres||[]))].sort((a,b)=>String(a).localeCompare(b,"el")).map(g=>`<option value="${esc(g)}">`).join("")}</datalist><div id="wz_ph"></div>
+  <p class="mu" style="font-size:12px;margin:0 0 8px">Ανά φάση: διάρκεια, ενέργεια, <b>είδος</b> (πολλά με κόμμα· ταιριάζει και μερικό όνομα, π.χ. «house»), <b>εύρος BPM</b> (κενό = γενικό) και <b>τρόπος μίξης</b>. Οι κανόνες Camelot και η καμπύλη ενέργειας ισχύουν σε όλες τις φάσεις· στις αλλαγές είδους δεν τιμωρείται το άλμα BPM.</p><datalist id="wz_gl">${[...new Set(T.flatMap(t=>t.genres||[]))].sort((a,b)=>String(a).localeCompare(b,"el")).map(g=>`<option value="${esc(g)}">`).join("")}</datalist><div id="wz_tl"></div><p class="mu" style="font-size:12px;margin:0 0 6px">Σύρε τα έγχρωμα μπλοκ για να αλλάξεις τη σειρά των φάσεων. Φανάρι: 🟢 αρκετή μουσική · 🟡 οριακά · 🔴 λίγη.</p><div id="wz_ph"></div>
   <div class="rrow" style="margin-top:10px"><span class="mu">Αφετηρία key</span><select id="wz_sk"><option value="">Αυτόματα (προτιμά 8A)</option>${CAMS.map(c=>`<option value="${c}"${sv.sk===c?" selected":""}>${padCam(c)}${KEYFEEL[c]?" — "+KEYFEEL[c]:""}</option>`).join("")}</select></div>
+  <div class="rrow"><span class="mu">Ώρα έναρξης σετ</span><input type="time" id="wz_st" value="${esc(sv.st||"")}"><span class="mu">(προαιρετικά — εμφανίζει ώρες ρολογιού)</span></div>
+  <label class="rrow"><input type="checkbox" id="wz_br"${sv.br===false?"":" checked"}> Γέφυρες BPM μεταξύ φάσεων: 2–3 ενδιάμεσα κομμάτια όταν το άλμα είναι ≥</label>
+  <div class="rrow" style="margin-left:24px"><input id="wz_bm" type="number" min="6" max="60" value="${sv.bm||14}" style="width:60px"><span class="mu">BPM</span></div>
   <div class="rrow"><span class="mu">Ένα βήμα +1 στο key ανά</span><select id="wz_ks">${opt([["1","1 βαθμό ενέργειας"],["1.5","1,5 βαθμό (≈ 3–4 βήματα από warm-up σε peak)"],["2","2 βαθμούς"],["3","3 βαθμούς"]],sv.ks||"1.5")}</select></div>
   <div class="rrow"><span class="mu">Φάσεις «Ανέβασμα/Κατέβασμα»: ένα βήμα κάθε</span><input id="wz_ce" type="number" min="3" max="60" value="${sv.ce||12}" style="width:64px"><span class="mu">λεπτά</span></div>
   <label class="rrow"><input type="checkbox" id="wz_md"${sv.md?" checked":""}> Mood switch A↔B (minor ⇄ major) σε στιγμές με σταθερή ενέργεια, κάθε</label>
@@ -2168,51 +2188,68 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
    <label class="rrow"><span class="mu">Τυχαιότητα</span><input id="wz_rz" type="range" min="0" max="12" value="${sv.rz==null?4:sv.rz}"></label>
    <label class="rrow"><input type="checkbox" id="wz_rc"${sv.rc===false?"":" checked"}> Αποφυγή όσων έπαιξαν τις τελευταίες 12 ώρες</label></div>
   ${fxHTML("wz")}</div>
- <div class="wz-s hide" data-n="4"><p id="wz_status" class="mu"></p><div id="wz_res"></div></div>
+ <div class="wz-s hide" data-n="4"><div id="wz_pre"></div><p id="wz_status" class="mu"></p><div id="wz_res"></div></div>
  <div class="mt" style="margin-top:12px;justify-content:space-between"><span><button class="sm" data-a="back">◀ Πίσω</button> <button class="sm" data-a="next">Επόμενο ▶</button></span>
   <span><button class="sm hide" id="wz_skip" data-a="skip">⏭ Παράλειψη ανάλυσης</button> <button class="big" id="wz_go" data-a="go" style="padding:10px 22px">🧭 Δημιουργία σετ</button></span></div></div>`;
  let step=1;const $$=s=>[...m.querySelectorAll(s)];
  const showStep=n=>{step=Math.max(1,Math.min(4,n));$$(".wz-s").forEach(e=>e.classList.toggle("hide",+e.dataset.n!==step));$$(".wz-pills button").forEach(b=>b.classList.toggle("on",+b.dataset.n===step))};
  const readPh=()=>$$("#wz_ph .wz-ph").map(r=>{const q=s=>r.querySelector(s);return{name:q(".pn").value||"Φάση",min:Math.max(1,+q(".pm").value||1),e0:Math.max(1,Math.min(10,+q(".p0").value||1)),e1:Math.max(1,Math.min(10,+q(".p1").value||1)),key:q(".pk").value,g:q(".pg").value.trim(),b1:Math.max(0,+q(".pb1").value||0),b2:Math.max(0,+q(".pb2").value||0),mx:q(".px").value}});
  const drawPh=()=>{$("wz_ph").innerHTML=WZ.phases.map((p,i)=>`<div class="wz-ph" data-i="${i}" style="border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"><div class="rrow"><input class="pn" value="${esc(p.name)}" style="width:104px"><input class="pm" type="number" min="1" max="600" value="${p.min}" style="width:58px"><span class="mu">΄ · ενέργεια</span><input class="p0" type="number" min="1" max="10" step="0.5" value="${p.e0}" style="width:54px"><span class="mu">→</span><input class="p1" type="number" min="1" max="10" step="0.5" value="${p.e1}" style="width:54px"><select class="pk">${opt(WZK,p.key)}</select><button class="sm" data-a="phup" title="Πάνω">↑</button><button class="sm" data-a="phdn" title="Κάτω">↓</button><button class="sm" data-a="phrm" title="Διαγραφή">✕</button></div><div class="rrow"><span class="mu">🎵</span><input class="pg" list="wz_gl" value="${esc(p.g||"")}" placeholder="είδος (κόμμα για πολλά) — κενό = όλα" style="flex:1;min-width:170px"><span class="mu">BPM</span><input class="pb1" type="number" min="30" max="220" value="${p.b1||""}" placeholder="γενικό" style="width:68px"><span class="mu">–</span><input class="pb2" type="number" min="30" max="220" value="${p.b2||""}" placeholder="γενικό" style="width:68px"><select class="px">${opt(MXO,p.mx||"auto")}</select><span class="mu pc" style="font-size:12px"></span></div></div>`).join("");tot();upd()};
- const tot=()=>{const t=readPh().reduce((a,p)=>a+p.min,0);$("wz_tot").textContent=`Σύνολο: ${t}΄ (${Math.floor(t/60)}ω ${t%60}΄)`};
+ const tot=()=>{const t=readPh().reduce((a,p)=>a+p.min,0);$("wz_tot").textContent=`Σύνολο: ${t}΄ (${Math.floor(t/60)}ω ${t%60}΄)`;drawTl()};
+ const drawTl=()=>{const e=$("wz_tl");if(!e)return;const rows=$$("#wz_ph .wz-ph"),P=readPh().map((p,k)=>({name:p.name,min:p.min,lt:rows[k]&&rows[k].dataset.lt||""})),st=$("wz_st")?$("wz_st").value:"";e.innerHTML=tlHTML(P,st,{drag:true});const pr=$("wz_pre");if(pr)pr.innerHTML=`<p class="mu" style="margin:0 0 4px;font-size:12px">Φανάρι βιβλιοθήκης ανά φάση: 🟢 αρκετή μουσική · 🟡 οριακά · 🔴 λίγη</p>`+tlHTML(P,st)};
+ const HT=()=>{const e=$("wz_ht");return!!(e&&e.checked)};
  const baseList=()=>{const sid=$("wz_src").value,pl=sid&&PL.find(x=>x.id===sid);let L=T.filter(t=>t.file);if(pl)L=L.filter(t=>inPL(t,pl));const g=new Set(ddVal("wz_g").map(lowS));if(g.size)L=L.filter(t=>(t.genres||[]).some(x=>g.has(lowS(x))));return L};
  let RG=null;const rng=()=>{const g1=+$("wz_b1").value||0,g2=+$("wz_b2").value||999;let lo=1e9,hi=0;readPh().forEach(p=>{lo=Math.min(lo,p.b1||g1);hi=Math.max(hi,p.b2||g2)});return lo===1e9?[g1,g2]:[lo,hi||g2]};
- const inRange=t=>{const[b1,b2]=RG||rng();return camP(t.cam)&&t.bpm&&t.bpm>=b1&&t.bpm<=b2};
+ const inRange=t=>{const[b1,b2]=RG||rng();return camP(t.cam)&&t.bpm&&bpmIn(t.bpm,b1,b2,HT())};
  const upd=()=>{RG=rng();const b=baseList(),p=b.filter(inRange),withE=p.filter(t=>energyOf(t)!=null).length;
   $("wz_cnt").textContent=T.some(t=>t.file)?`Διαθέσιμα: ${b.length} τραγούδια · με key & BPM στο εύρος: ${p.length}`:"⚠ Κανένα τραγούδι με αρχείο — πρόσθεσε ξανά τους φακέλους με τη μουσική (📚).";
   $("wz_en").textContent=`Με γνωστή ενέργεια: ${withE} από ${p.length} (tags: ${p.filter(t=>t.esrc==="tag").length} · αυτόματα: ${p.filter(t=>t.esrc==="auto").length} · χειροκίνητα: ${p.filter(t=>t.esrc==="manual").length})`;
   const g1=+$("wz_b1").value||0,g2=+$("wz_b2").value||999;$$("#wz_ph .wz-ph").forEach(r=>{const q=s=>r.querySelector(s),gt=gTerms(q(".pg").value),lo=+q(".pb1").value||g1,hi=+q(".pb2").value||g2,mn=+q(".pm").value||0;
-   const L=b.filter(t=>camP(t.cam)&&t.bpm&&t.bpm>=lo&&t.bpm<=hi&&gMatch(t,gt)),mins=Math.round(L.reduce((a,t)=>a+(t.dur||300),0)/60),el=q(".pc");el.textContent=`${L.length} τρ. · ${mins}΄`;el.style.color=mins<mn?"var(--ac)":"";el.title=mins<mn?"Λιγότερα λεπτά μουσικής από τη διάρκεια της φάσης":"Διαθέσιμα τραγούδια με key & BPM"})};
+   const L=b.filter(t=>camP(t.cam)&&t.bpm&&bpmIn(t.bpm,lo,hi,HT())&&gMatch(t,gt)),mins=Math.round(L.reduce((a,t)=>a+(t.dur||300),0)/60),el=q(".pc"),lt=mins<mn?"🔴":mins<mn*1.5?"🟡":"🟢";r.dataset.lt=lt;el.textContent=`${lt} ${L.length} τρ. · ${mins}΄`;el.style.color=mins<mn?"var(--ac)":"";el.title=mins<mn?"Λιγότερα λεπτά μουσικής από τη διάρκεια της φάσης":"Διαθέσιμα τραγούδια με key & BPM"});drawTl()};
  const cfgRead=()=>{const g=id=>$(id),sty=g("wz_sty").value,fx=fxCfg("wz");return{style:sty,b1:+g("wz_b1").value||WZS[sty].b1,b2:+g("wz_b2").value||WZS[sty].b2,jump:+g("wz_j").value||6,sk:g("wz_sk").value,ks:g("wz_ks").value,ce:+g("wz_ce").value||12,md:g("wz_md").checked,mg:+g("wz_mg").value||6,
-  ak:g("wz_ak").checked,ae:g("wz_ae").checked,lim:+g("wz_lim").value||250,ma:g("wz_ma").value,ag:g("wz_ag").value,rz:+g("wz_rz").value,rc:g("wz_rc").checked,phases:readPh(),fx}};
+  ak:g("wz_ak").checked,ae:g("wz_ae").checked,lim:+g("wz_lim").value||250,ma:g("wz_ma").value,ag:g("wz_ag").value,rz:+g("wz_rz").value,rc:g("wz_rc").checked,ht:g("wz_ht").checked,br:g("wz_br").checked,bm:+g("wz_bm").value||14,st:g("wz_st").value,phases:readPh(),fx}};
  const save=()=>{try{const c=cfgRead();delete c.fx;localStorage.setItem("mlwiz",JSON.stringify(c))}catch(e){}};
- const mkRes=r=>{const items=r.items,mv=r.moves,pc=k=>mv[k]||0;
-  $("wz_res").innerHTML=`<p><b>${r.mix.length} τραγούδια · ${hms(r.tot)} · μέση ποιότητα μετάβασης ${r.avg}%</b><br><span class="mu">Κινήσεις key: ίδιο ${pc("same")} · +1 ${pc("+1")} · −1 ${pc("-1")} · mood switch ${pc("switch")} · ρίσκο ${pc("+-2")+pc("diag")} · clash ${pc("clash")}</span></p>`+
-   r.warn.map(w=>`<p style="color:var(--ac)">⚠ ${esc(w)}</p>`).join("")+wzChart(r)+
-   `<div class="mt"><button class="big" data-a="play" style="padding:9px 20px">▶ Παίξε το σετ</button><button class="sm" data-a="savepl">💾 Αποθήκευση ως playlist</button><button class="sm" data-a="again">🔀 Νέα εκδοχή</button><button class="sm" data-a="copy">📋 Αντιγραφή setlist</button></div>`+
-   `<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:13px;margin:8px 0"><tr class="mu"><th align="left">Φάση</th><th align="left">Ώρα</th><th>Τρ.</th><th>Ενέργεια (στόχος)</th><th align="left">Πορεία key</th></tr>`+
-   r.phases.map(p=>`<tr><td style="padding:3px 6px 3px 0">${esc(p.name)}${p.g?`<br><small class="mu">${esc(p.g)}</small>`:""}</td><td>${hms(p.s)}–${hms(p.e)}</td><td align="center">${p.n}</td><td align="center">${p.avgE.toFixed(1)} (${p.avgT.toFixed(1)})</td><td>${esc(p.keys.map(padCam).filter((k,i,a)=>!i||k!==a[i-1]).join(" → "))}</td></tr>`).join("")+`</table></div>`+
-   items.map((x,i)=>`<div class="mr"><span class="mu" style="min-width:46px">${hms(x.start)}</span>${i?`<span class="sgs" style="background:hsl(${Math.round(x.score*1.2)} 60% 38%)">${x.score}%</span>`:'<span class="sgs" style="background:var(--bd)">▶</span>'}<span class="ell"><b>${esc(x.t.title||x.t.fname)}</b> <span class="mu">${esc(x.t.artist||"")}</span><br><small class="mu"><span class="chip" style="font-weight:700">${esc(r.marks[x.ph].p.name)}</span><span class="chip">${esc(padCam(x.t.cam))}${KEYFEEL[x.t.cam]?" · "+KEYFEEL[x.t.cam].split(" — ")[0]:""}</span><span class="chip">${i?esc(mvLabel(x.mv)):"αρχή"}</span><span class="chip">${Math.round(x.t.bpm)} BPM${x.dbpm?` (${x.dbpm>0?"+":""}${x.dbpm})`:""}</span>${x.est?'<span class="chip">ενέργεια ~εκτίμηση BPM</span>':""}</small></span><select data-ee="${i}" title="Ενέργεια (αλλάζει μόνιμα)">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option${v===Math.round(x.e)?" selected":""}>${v}</option>`).join("")}</select></div>`).join("")};
- const run=async()=>{const cfg=cfgRead();save();RG=rng();showStep(4);const go=$("wz_go"),sk=$("wz_skip"),stt=$("wz_status");go.disabled=true;sk.classList.remove("hide");WZ.skip=false;$("wz_res").innerHTML="";
+ const mkRes=r=>{const items=r.items,mv=r.moves,pc=k=>mv[k]||0,st=WZ.st,lk=WZ.lk;
+  $("wz_res").innerHTML=`<p><b>${r.mix.length} τραγούδια · ${hms(r.tot)} · μέση ποιότητα μετάβασης ${r.avg}%</b><br><span class="mu">Κινήσεις key: ίδιο ${pc("same")} · +1 ${pc("+1")} · −1 ${pc("-1")} · mood switch ${pc("switch")} · ρίσκο ${pc("+-2")+pc("diag")} · clash ${pc("clash")}${items.some(x=>x.br)?` · γέφυρες BPM ${items.filter(x=>x.br).length}`:""}</span></p>`+
+   r.warn.map(w=>`<p style="color:var(--ac)">⚠ ${esc(w)}</p>`).join("")+tlHTML(r.marks.map((m,k)=>({name:m.p.name,min:m.p.min,lk:lk.ph.has(k)})),st)+wzChart(r)+
+   `<div class="mt"><button class="big" data-a="play" style="padding:9px 20px">▶ Παίξε το σετ</button><button class="sm" data-a="savepl">💾 Αποθήκευση ως playlist</button><button class="sm" data-a="again">🔀 Νέα εκδοχή (κρατά τα 🔒)</button><button class="sm" data-a="copy">📋 Αντιγραφή setlist</button><button class="sm" data-a="m3u">⬇ M3U</button><button class="sm" data-a="csv">⬇ CSV</button></div>`+
+   `<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:13px;margin:8px 0"><tr class="mu"><th align="left">Φάση</th><th align="left">Ώρα</th><th>Τρ.</th><th>Ενέργεια (στόχος)</th><th align="left">Πορεία key</th><th></th></tr>`+
+   r.phases.map((p,k)=>`<tr><td style="padding:3px 6px 3px 0">${esc(p.name)}${p.g?`<br><small class="mu">${esc(p.g)}</small>`:""}</td><td>${st?clk(st,p.s)+"–"+clk(st,p.e):hms(p.s)+"–"+hms(p.e)}</td><td align="center">${p.n}</td><td align="center">${p.avgE.toFixed(1)} (${p.avgT.toFixed(1)})</td><td>${esc(p.keys.map(padCam).filter((k,i,a)=>!i||k!==a[i-1]).join(" → "))}</td><td style="white-space:nowrap"><button class="sm" data-a="plk" data-p="${k}" title="Κλείδωμα φάσης">${lk.ph.has(k)?"🔒":"🔓"}</button><button class="sm" data-a="preg" data-p="${k}" title="Αναδημιουργία μόνο αυτής της φάσης">🔄</button></td></tr>`).join("")+`</table></div>`+
+   items.map((x,i)=>`<div class="mr"${lk.tr.has(x.t)||lk.ph.has(x.ph)?' style="background:var(--ac2)"':""}><span class="mu" style="min-width:46px">${st?clk(st,x.start):hms(x.start)}</span>${i?`<span class="sgs" style="background:hsl(${Math.round(x.score*1.2)} 60% 38%)">${x.score}%</span>`:'<span class="sgs" style="background:var(--bd)">▶</span>'}<span class="ell"><b>${esc(x.t.title||x.t.fname)}</b> <span class="mu">${esc(x.t.artist||"")}</span><br><small class="mu"><span class="chip" style="font-weight:700">${esc(r.marks[x.ph].p.name)}</span><span class="chip">${esc(padCam(x.t.cam))}${KEYFEEL[x.t.cam]?" · "+KEYFEEL[x.t.cam].split(" — ")[0]:""}</span><span class="chip">${i?esc(mvLabel(x.mv)):"αρχή"}</span><span class="chip">${Math.round(x.t.bpm)} BPM${x.bx&&Math.abs(x.bx-x.t.bpm)>.5?` ≈${Math.round(x.bx)}`:""}${x.dbpm?` (${x.dbpm>0?"+":""}${x.dbpm})`:""}</span>${x.est?'<span class="chip">ενέργεια ~εκτίμηση BPM</span>':""}${x.br?'<span class="chip">🌉 γέφυρα BPM</span>':""}</small></span><button class="sm" data-a="lk" data-i="${i}" title="Κλείδωμα τραγουδιού">${lk.tr.has(x.t)?"🔒":"🔓"}</button><button class="sm" data-a="alt" data-i="${i}" title="Εναλλακτικές">🔁</button><select data-ee="${i}" title="Ενέργεια (αλλάζει μόνιμα)">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option${v===Math.round(x.e)?" selected":""}>${v}</option>`).join("")}</select></div><div class="hide" data-alt="${i}"></div>`).join("")};
+ const run=async(o={})=>{const cfg=cfgRead();save();RG=rng();showStep(4);{const pr=$("wz_pre");if(pr)pr.classList.add("hide")}const go=$("wz_go"),sk=$("wz_skip"),stt=$("wz_status");go.disabled=true;sk.classList.remove("hide");WZ.skip=false;$("wz_res").innerHTML="";
   try{const base=baseList();if(!base.length){stt.textContent="⚠ Κανένα τραγούδι με αρχείο στην πηγή που επέλεξες.";return}
    if(cfg.ak){const miss=shuffled(base.filter(t=>!t.cam||!t.bpm)).slice(0,cfg.lim);for(let i=0;i<miss.length&&!WZ.skip;i++){stt.textContent=`🎼 Ανάλυση key/BPM ${i+1}/${miss.length}…`;await analyzeFile(miss[i],{key:!miss[i].cam,bpm:!miss[i].bpm})}if(miss.length)render()}
    WZ.skip=false;const pool=base.filter(inRange);if(!pool.length){stt.textContent="⚠ Κανένα τραγούδι με key και BPM μέσα στο εύρος BPM. Διεύρυνε το εύρος ή άφησε ενεργή την ανάλυση key/BPM.";return}
+   let fixed=null,must=null;{const L=WZ.last,lk=WZ.lk;if(L&&L.marks.length!==cfg.phases.length)WZ.lk=newLk();else if(L&&(lk.ph.size||lk.tr.size||o.only!==undefined)){fixed=new Map();must=new Map();L.items.forEach(x=>{const p=x.ph;if(o.only!==undefined?p!==o.only:lk.ph.has(p)){if(!fixed.has(p))fixed.set(p,[]);fixed.get(p).push(x.t)}else if(lk.tr.has(x.t))must.set(x.t,p)});
+    const lt=new Set();fixed.forEach(a=>a.forEach(t=>lt.add(t)));must.forEach((v,t)=>lt.add(t));lt.forEach(t=>{if(!pool.includes(t))pool.push(t)})}}
    const need=pool.filter(t=>energyOf(t)==null);
    if(cfg.ae&&need.length){const part=shuffled(need).slice(0,cfg.lim);for(let i=0;i<part.length&&!WZ.skip;i++){stt.textContent=`⚡ Ανάλυση ενέργειας ${i+1}/${part.length}…`;await analyzeEnergy(part[i]);if(i%10===9)await new Promise(r=>setTimeout(r))}energyRecalc()}
    WZ.skip=false;const en=new Map(),est=new Set(),bs=pool.map(t=>t.bpm).sort((a,b)=>a-b);
    pool.forEach(t=>{let e=energyOf(t);if(e==null){let lo=0;while(lo<bs.length&&bs[lo]<t.bpm)lo++;e=Math.round(1+9*lo/Math.max(1,bs.length-1));est.add(t)}en.set(t,e)});
    if(est.size===pool.length)stt.textContent="⚠ Καμία γνωστή ενέργεια — χρησιμοποιώ εκτίμηση από το BPM. Άφησε ενεργή την «Ανάλυση ενέργειας» για καλύτερο αποτέλεσμα.";else stt.textContent="";
-   const r=planSet(pool,{phases:cfg.phases,energy:en,est,b1:cfg.b1,b2:cfg.b2,jump:cfg.jump,startKey:cfg.sk,keyStep:+cfg.ks,climbEvery:cfg.ce,mood:cfg.md,moodGap:cfg.mg,maxA:+cfg.ma,gap:+cfg.ag,rz:cfg.rz,recent:cfg.rc});
+   const r=planSet(pool,{phases:cfg.phases,energy:en,est,b1:cfg.b1,b2:cfg.b2,jump:cfg.jump,startKey:cfg.sk,keyStep:+cfg.ks,climbEvery:cfg.ce,mood:cfg.md,moodGap:cfg.mg,maxA:+cfg.ma,gap:+cfg.ag,rz:cfg.rz,recent:cfg.rc,ht:cfg.ht,bridge:cfg.br,brMin:cfg.bm,fixed,must});
    if(!r||!r.mix.length){stt.textContent="⚠ Δεν βρέθηκε σετ με αυτές τις ρυθμίσεις.";return}
    const fc=cfg.fx;WZ.per=new Map();r.items.forEach(x=>{const ph=cfg.phases[x.ph],mx=ph&&MXS[ph.mx];if(mx)WZ.per.set(x.t,mx)});const anySm=[...WZ.per.values()].some(v=>v.smart);
    if(fc.trimS||fc.trimE||fc.smart||anySm)await djPts(r.mix,{...fc,smart:fc.smart||anySm},msg=>{stt.textContent=msg},()=>WZ.skip);
-   WZ.last=r;mkRes(r)}
+   WZ.last=r;WZ.ctx={pool,en,est,jump:cfg.jump,ht:cfg.ht};WZ.st=cfg.st;mkRes(r)}
   catch(e){console.error(e);stt.textContent="⚠ Σφάλμα: "+(e&&e.message||e)}
   finally{go.disabled=false;sk.classList.add("hide")}};
- const setList=r=>r.items.map((x,i)=>`${String(i+1).padStart(2,"0")}  ${hms(x.start)}  ${x.t.artist?x.t.artist+" – ":""}${x.t.title||x.t.fname}  [${r.marks[x.ph].p.name} · ${padCam(x.t.cam)} · ${Math.round(x.t.bpm)} BPM · E${Math.round(x.e)}${i?" · "+mvLabel(x.mv):""}]`).join("\n");
+ const setList=r=>r.items.map((x,i)=>`${String(i+1).padStart(2,"0")}  ${WZ.st?clk(WZ.st,x.start):hms(x.start)}  ${x.t.artist?x.t.artist+" – ":""}${x.t.title||x.t.fname}  [${r.marks[x.ph].p.name} · ${padCam(x.t.cam)} · ${Math.round(x.t.bpm)} BPM · E${Math.round(x.e)}${i?" · "+mvLabel(x.mv):""}]`).join("\n");
+ const altFor=wzAlt,swapTo=wzSwap,dl=wzDl,setCsv=wzCsv;
+ m.ondragstart=e=>{const b=e.target.closest&&e.target.closest("#wz_tl .tlb[draggable]");if(b){WZ.drag=+b.dataset.i;try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(WZ.drag))}catch(x){}}};
+ m.ondragover=e=>{if(e.target.closest&&e.target.closest("#wz_tl"))e.preventDefault()};
+ m.ondrop=e=>{const b=e.target.closest&&e.target.closest("#wz_tl .tlb");if(!b||WZ.drag==null)return;e.preventDefault();const to=+b.dataset.i,from=WZ.drag;WZ.drag=null;if(from===to)return;WZ.phases=readPh();const q=WZ.phases.splice(from,1)[0];WZ.phases.splice(to,0,q);WZ.lk=newLk();drawPh();save()};
  m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a,row=b.closest(".wz-ph"),i=row?+row.dataset.i:-1;
-  if(a==="step")showStep(+b.dataset.n);else if(a==="next")showStep(step+1);else if(a==="back")showStep(step-1);else if(a==="skip")WZ.skip=true;else if(a==="go"||a==="again")run();
+  if(a==="step")showStep(+b.dataset.n);else if(a==="next")showStep(step+1);else if(a==="back")showStep(step-1);else if(a==="skip")WZ.skip=true;else if(a==="go"){WZ.lk=newLk();run()}else if(a==="again")run();
+  else if(a==="lk"&&WZ.last){const t=WZ.last.items[+b.dataset.i].t;if(WZ.lk.tr.has(t))WZ.lk.tr.delete(t);else WZ.lk.tr.add(t);mkRes(WZ.last)}
+  else if(a==="plk"&&WZ.last){const q=+b.dataset.p;if(WZ.lk.ph.has(q))WZ.lk.ph.delete(q);else WZ.lk.ph.add(q);mkRes(WZ.last)}
+  else if(a==="preg"&&WZ.last)run({only:+b.dataset.p});
+  else if(a==="alt"&&WZ.last){const k0=+b.dataset.i,box=m.querySelector(`[data-alt="${k0}"]`);if(!box)return;if(!box.classList.contains("hide")){box.classList.add("hide");return}
+   m.querySelectorAll("[data-alt]").forEach(el=>el.classList.add("hide"));const L=altFor(k0);WZ.alts=L;
+   box.innerHTML=L.length?`<div style="margin:2px 0 8px 46px;padding:6px 8px;border:1px dashed var(--bd);border-radius:8px"><div class="mu" style="font-size:12px">Συμβατό key, BPM και ενέργεια — πάτα για αντικατάσταση:</div>`+L.map((o2,k)=>`<button class="sm" data-a="swap" data-i="${k0}" data-k="${k}" style="display:block;width:100%;text-align:left;margin-top:4px">${esc(o2.c.artist?o2.c.artist+" – ":"")}${esc(o2.c.title||o2.c.fname)} <span class="mu">· ${esc(padCam(o2.c.cam))} · ${Math.round(o2.c.bpm)} BPM · E${Math.round(o2.e)}</span></button>`).join("")+`</div>`:`<p class="mu" style="margin:2px 0 8px 46px">Δεν βρέθηκαν συμβατές εναλλακτικές.</p>`;box.classList.remove("hide")}
+  else if(a==="swap"&&WZ.last&&WZ.alts){const o2=WZ.alts[+b.dataset.k];if(o2){swapTo(+b.dataset.i,o2.c);mkRes(WZ.last);toast("Το τραγούδι αντικαταστάθηκε")}}
+  else if(a==="m3u"&&WZ.last){let pf="";try{pf=localStorage.getItem("mlprefix")||""}catch(x){}const r=exportBuild(WZ.last.mix,{fmt:"m3u8",mode:pf?"abs":"rel",prefix:pf,meta:true});dl("Set_"+new Date().toISOString().slice(0,10)+".m3u8",r.text,r.mime);toast("✅ Το M3U κατέβηκε")}
+  else if(a==="csv"&&WZ.last){dl("Set_"+new Date().toISOString().slice(0,10)+".csv",setCsv(WZ.last),"text/csv");toast("✅ Το CSV κατέβηκε")}
   else if(a==="tpl"){WZ.phases=tplPh($("wz_tpl").value);drawPh();save()}
   else if(a==="addph"){WZ.phases=readPh();WZ.phases.push({name:"Φάση "+(WZ.phases.length+1),min:15,e0:5,e1:7,key:"auto"});drawPh()}
   else if(a==="phrm"){WZ.phases=readPh();if(WZ.phases.length>1)WZ.phases.splice(i,1);drawPh();save()}
@@ -2227,9 +2264,115 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
   upd();tot();save()};
  drawPh();ddBind("wz_g",upd);upd();showStep(1)}
 
+const wzAlt=i=>{const r=WZ.last,C=WZ.ctx;if(!r||!C)return[];const it=r.items,x=it[i],pv=it[i-1],nx=it[i+1],used=new Set(it.map(y=>y.t)),jp=(+C.jump||6)*1.6,gt=gTerms(r.marks[x.ph].p.g),
+   bd=(a,b)=>a&&b?(C.ht?Math.min(Math.abs(a-b),Math.abs(a-2*b),Math.abs(a-b/2)):Math.abs(a-b)):0;
+  return C.pool.filter(c=>!used.has(c)&&camP(c.cam)&&C.en.has(c)).map(c=>{const e=C.en.get(c),de=Math.abs(e-x.e);if(de>1.5||(gt.length&&!gMatch(c,gt)))return null;
+   for(const o of[pv&&pv.t,nx&&nx.t]){if(!o)continue;if(camMove(o.cam,c.cam).k==="clash"||bd(o.bpm,c.bpm)>jp)return null}
+   return{c,e,s:(pv?mixScore(pv.t,c,true):0)+(nx?mixScore(c,nx.t,true):0)-de*8}}).filter(Boolean).sort((a,b)=>b.s-a.s).slice(0,8)};
+const wzSwap=(i,c)=>{const r=WZ.last,x=r.items[i],old=x.t;WZ.lk.tr.delete(old);x.t=c;x.e=WZ.ctx.en.get(c);x.est=WZ.ctx.est.has(c);x.br=false;planFin(r);if(WZ.per){const mx=MXS[r.marks[x.ph].p.mx];WZ.per.delete(old);if(mx)WZ.per.set(c,mx)}};
+const wzDl=(name,text,mime)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:mime+";charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},1500)};
+const wzCsv=r=>{const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';return"\ufeff"+[["#","Έναρξη","Ώρα ρολογιού","Φάση","Καλλιτέχνης","Τίτλος","Key","BPM","Ενέργεια","Μετάβαση","Διάρκεια","Διαδρομή"].map(q).join(",")].concat(r.items.map((x,i)=>[i+1,hms(x.start),clk(WZ.st,x.start),r.marks[x.ph].p.name,x.t.artist,x.t.title||x.t.fname,padCam(x.t.cam),x.t.bpm?Math.round(x.t.bpm*10)/10:"",Math.round(x.e),i?mvLabel(x.mv)+(x.br?" · γέφυρα BPM":""):"αρχή",hms(x.t.dur||0),x.t.path||x.t.fname].map(q).join(","))).join("\n")+"\n"};
+
+/* ===== Easy wizard: ένα βήμα / μία οθόνη τη φορά ===== */
+const EZ={init:0,step:1,hours:2,st:"",tpl:"classic",src:"",ht:false,br:true,ma:true,an:true,sm:true,phases:null,skip:false,busy:false,fc:null};
+const EZT=[
+ {k:"classic",w:"2h",i:"🌙",n:"Κλασική νύχτα",d:"Ζέσταμα → ανάβαση → κορυφή → χαλάρωμα. Δουλεύει με κάθε βιβλιοθήκη."},
+ {k:"two",w:"wave",i:"⛰️",n:"Δύο κορυφές",d:"Δύο κορυφώσεις με ένα διάλειμμα στη μέση."},
+ {k:"peak",w:"peak",i:"🔥",n:"Peak-time",d:"Ξεκινά ήδη ψηλά και μένει στην κορυφή."},
+ {k:"genres",w:"genres4",i:"🧭",n:"Ταξίδι ειδών",d:"Chill → deep house → tech house → techno."},
+ {k:"reggae",w:"reggae",i:"🌴",n:"Από reggae/dub σε house",d:"Αργά κομμάτια που ανεβαίνουν ως house/techno — με half-time BPM και γέφυρες.",ht:1},
+ {k:"mega",w:"mega",i:"🚀",n:"Πολύωρο ταξίδι",d:"Chill → techno → deep → dub → reggae → rock. Για 5–6 ώρες.",ht:1}];
+const ezPh=(k,h)=>{const t=EZT.find(x=>x.k===k)||EZT[0],P=tplPh(t.w),tot=Math.round(h*60),sum=P.reduce((a,p)=>a+p.min,0);let acc=0;P.forEach((p,i)=>{p.min=i===P.length-1?Math.max(5,tot-acc):Math.max(5,Math.round(p.min*tot/sum));acc+=p.min});return P};
+const ezP=()=>EZ.phases||(EZ.phases=ezPh(EZ.tpl,EZ.hours));
+const ezBase=()=>{const pl=EZ.src&&PL.find(x=>x.id===EZ.src);let L=T.filter(t=>t.file);if(pl)L=L.filter(t=>inPL(t,pl));return L};
+const ezGenres=()=>{const c=new Map();ezBase().forEach(t=>(t.genres||[]).forEach(g=>c.set(g,(c.get(g)||0)+1)));return[...c.entries()].sort((a,b)=>b[1]-a[1]).slice(0,60).map(x=>x[0])};
+const ezLight=p=>{const L=ezBase().filter(t=>camP(t.cam)&&t.bpm&&bpmIn(t.bpm,p.b1,p.b2,EZ.ht)&&gMatch(t,gTerms(p.g))),mins=Math.round(L.reduce((a,t)=>a+(t.dur||300),0)/60);return{n:L.length,mins,lt:mins<p.min?"🔴":mins<p.min*1.5?"🟡":"🟢"}};
+const ezTog=(k,t,d)=>`<div class="ezt${EZ[k]?" on":""}" data-ez="tog" data-v="${k}"><b>${EZ[k]?"✅":"⬜"} ${t}</b><small>${d}</small></div>`;
+const ezScr={
+ 1:()=>`<h3 class="ez-h">Γεια σου! 👋 Πόσο να διαρκέσει το σετ;</h3><p class="mu">Θα στήσουμε μαζί το σετ σου, ένα βήμα τη φορά — δεν χρειάζεται να ξέρεις τίποτα τεχνικό. Διάλεξε διάρκεια:</p><div class="ezg">${[1,2,3,4,6,8].map(h=>`<div class="ezt${EZ.hours===h?" on":""}" data-ez="hrs" data-v="${h}"><b>${h} ${h===1?"ώρα":"ώρες"}</b></div>`).join("")}</div><div class="rrow"><span class="mu">ή γράψε δικό σου:</span><input id="ez_h" type="number" min="0.5" max="24" step="0.5" value="${EZ.hours}" style="width:80px"><span class="mu">ώρες</span></div>`,
+ 2:()=>`<h3 class="ez-h">Τι ώρα ξεκινάς; 🕙</h3><p class="mu">Έτσι θα βλέπεις το πρόγραμμα με ώρες ρολογιού (π.χ. «22:00 Warm-up · 00:20 Peak»). Είναι προαιρετικό.</p><div class="ezg">${["21:00","22:00","23:00","00:00"].map(h=>`<div class="ezt${EZ.st===h?" on":""}" data-ez="st" data-v="${h}"><b>${h}</b></div>`).join("")}<div class="ezt${EZ.st?"":" on"}" data-ez="st" data-v=""><b>Χωρίς ώρα</b></div></div><div class="rrow"><span class="mu">ή διάλεξε ώρα:</span><input type="time" id="ez_t" value="${esc(EZ.st)}"></div>`,
+ 3:()=>`<h3 class="ez-h">Τι ταξίδι θέλεις; 🧭</h3><p class="mu">Διάλεξε το σχήμα της βραδιάς — τα έγχρωμα μπλοκ δείχνουν τις φάσεις στη διάρκεια που διάλεξες.</p>`+EZT.map(t=>`<div class="ezt${EZ.tpl===t.k?" on":""}" data-ez="tpl" data-v="${t.k}" style="margin:8px 0"><b>${t.i} ${esc(t.n)}</b><small>${esc(t.d)}</small>${tlHTML(ezPh(t.k,EZ.hours).map(p=>({name:p.name,min:p.min})),EZ.st)}</div>`).join(""),
+ 4:()=>{const all=T.filter(t=>t.file),kb=all.filter(t=>camP(t.cam)&&t.bpm).length;return`<h3 class="ez-h">Από πού να πάρω μουσική; 📚</h3><p class="mu">Έχεις ${all.length} τραγούδια με αρχείο· τα ${kb} έχουν ήδη key και BPM.</p>${all.length?"":'<p style="color:var(--ac)">⚠ Δεν υπάρχουν τραγούδια με αρχείο — πρόσθεσε πρώτα τους φακέλους με τη μουσική (κουμπί 📚).</p>'}<div class="ezg" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))"><div class="ezt${EZ.src?"":" on"}" data-ez="src" data-v=""><b>📚 Όλη η βιβλιοθήκη</b><small>${all.length} τραγούδια</small></div>${PL.map(p=>`<div class="ezt${EZ.src===p.id?" on":""}" data-ez="src" data-v="${p.id}"><b>${p.smart?"✨":"🎶"} ${esc(p.name)}</b><small>${T.filter(t=>t.file&&inPL(t,p)).length} τραγούδια</small></div>`).join("")}</div>`+ezTog("an","Να αναλύσω αυτόματα ό,τι λείπει","Key, BPM και ενέργεια για τα τραγούδια που δεν τα έχουν (έως 250 ανά φορά). Μπορείς να το παραλείψεις όσο τρέχει.")},
+ 5:()=>`<h3 class="ez-h">Πόσο ομαλές να είναι οι αλλαγές; 🎚</h3><p class="mu">Πάτα για να ανοίξεις ή να κλείσεις κάθε επιλογή.</p>`+ezTog("ht","Half-time / double-time BPM","Το 70 BPM (dub, reggae) θεωρείται ίσο με το 140 και το 65 με το 130 — περνάς από reggae σε house ή techno χωρίς απότομο άλμα.")+ezTog("br","Γέφυρες BPM ανάμεσα στις φάσεις","Όταν το tempo πρέπει να αλλάξει πολύ (π.χ. 100 → 128), βάζω 2–3 ενδιάμεσα κομμάτια που ανεβάζουν σταδιακά το tempo.")+ezTog("ma","Χωρίς επαναλήψεις καλλιτεχνών","Το πολύ 2 κομμάτια ανά καλλιτέχνη και όχι τον ίδιο κοντά-κοντά.")+ezTog("sm","Έξυπνες μεταβάσεις","Διαλέγω εγώ πότε και πόσο θα κρατά κάθε μίξη (λίγο πιο αργό στη δημιουργία).")+`<p class="mu" style="font-size:12px">Και πάντα μένουν τα key (Camelot) και η καμπύλη ενέργειας — δεν χρειάζεται να τα ρυθμίσεις.</p>`,
+ 6:()=>{const P=ezP(),gl=ezGenres(),rows=P.map(ezLight),tot=P.reduce((a,p)=>a+p.min,0),miss=ezBase().filter(t=>!camP(t.cam)||!t.bpm).length;
+  return`<h3 class="ez-h">Έλεγχος του προγράμματος ✅</h3><p class="mu">Σύρε τα μπλοκ για να αλλάξεις σειρά. Φανάρι ανά φάση — έχει η βιβλιοθήκη σου αρκετή μουσική; 🟢 άνετα · 🟡 οριακά · 🔴 λίγη (άλλαξε είδος ή βγάλε το όριο BPM).</p><div id="ez_tl">${tlHTML(P.map((p,i)=>({name:p.name,min:p.min,lt:rows[i].lt})),EZ.st,{drag:true})}</div><p class="mu" style="margin:0 0 6px">Σύνολο: ${Math.floor(tot/60)}ω ${tot%60}΄${miss&&EZ.an?` · ${miss} τραγούδια χωρίς key/BPM θα αναλυθούν και ίσως προστεθούν`:""}</p>`+
+  P.map((p,i)=>`<div style="border:1px solid var(--bd);border-radius:12px;padding:10px;margin:8px 0"><div class="rrow"><span style="width:12px;height:12px;border-radius:50%;background:${PHC(i)};flex:none"></span><b>${esc(p.name)}</b><span class="mu">${rows[i].lt} ${rows[i].n} τρ. · ${rows[i].mins}΄ διαθέσιμα</span><span style="margin-left:auto"><button class="sm" data-ez="pup" data-i="${i}">↑</button> <button class="sm" data-ez="pdn" data-i="${i}">↓</button></span></div><div class="rrow"><span class="mu">Διάρκεια</span><input type="number" min="5" max="600" value="${p.min}" data-ezi="pm" data-i="${i}" style="width:70px"><span class="mu">΄ · Είδος</span><select data-ezi="pg" data-i="${i}"><option value="">Όλα τα είδη</option>${p.g&&!gl.includes(p.g)?`<option value="${esc(p.g)}" selected>${esc(p.g)}</option>`:""}${gl.map(g=>`<option value="${esc(g)}"${g===p.g?" selected":""}>${esc(g)}</option>`).join("")}</select>${p.b1||p.b2?`<span class="chip">${p.b1||"…"}–${p.b2||"…"} BPM</span><button class="sm" data-ez="pbf" data-i="${i}" title="Χωρίς όριο BPM">✕ όριο</button>`:""}</div></div>`).join("")},
+ 7:()=>{const P=ezP(),tot=P.reduce((a,p)=>a+p.min,0),t=EZT.find(x=>x.k===EZ.tpl)||EZT[0],pl=EZ.src&&PL.find(x=>x.id===EZ.src),op=[EZ.ht&&"½×/2× BPM",EZ.br&&"γέφυρες BPM",EZ.ma&&"χωρίς επαναλήψεις καλλιτεχνών",EZ.sm&&"έξυπνες μεταβάσεις"].filter(Boolean).join(" · ");
+  return`<h3 class="ez-h">Όλα έτοιμα! 🎶</h3><p class="mu">Έτσι θα στήσω το σετ σου:</p><div style="line-height:1.9">⏱ <b>${Math.floor(tot/60)}ω ${tot%60}΄</b>${EZ.st?` · ξεκινά ${esc(EZ.st)}, τελειώνει ${clk(EZ.st,tot*60)}`:""}<br>${t.i} <b>${esc(t.n)}</b> · ${P.length} φάσεις<br>📚 ${pl?esc(pl.name):"Όλη η βιβλιοθήκη"}<br>🎚 ${op||"χωρίς πρόσθετες επιλογές"}</div><div class="mt" style="margin-top:18px"><button class="big" id="ez_go" data-ez="go" style="padding:14px 30px;font-size:18px">✨ Φτιάξε το σετ</button><button class="sm hide" id="ez_skip" data-ez="skip">⏭ Παράλειψη ανάλυσης</button></div><p id="ez_st" class="mu"></p>`},
+ 8:()=>{const r=WZ.last;if(!r)return ezScr[7]();const lk=WZ.lk,st=WZ.st,nb=r.items.filter(x=>x.br).length;
+  let h=`<h3 class="ez-h">🎉 Το σετ σου είναι έτοιμο!</h3><p><b>${r.mix.length} τραγούδια · ${hms(r.tot)}${st?` · ${clk(st,0)} → ${clk(st,r.tot)}`:""}</b><br><span class="mu">Μέση ποιότητα μετάβασης ${r.avg}%${nb?` · ${nb} γέφυρες BPM`:""}</span></p>`+r.warn.map(w=>`<p style="color:var(--ac)">⚠ ${esc(w)}</p>`).join("")+tlHTML(r.marks.map((m,k)=>({name:m.p.name,min:m.p.min,lk:lk.ph.has(k)})),st)+`<p class="mu" style="font-size:13px">💡 Κλείδωσε (🔒) ό,τι σου αρέσει και πάτα «🔄 Άλλαξε τη φάση» εκεί που δεν σε κάλυψε — οι υπόλοιπες μένουν ίδιες. Με το 🔁 σε κάθε τραγούδι βλέπεις συμβατές εναλλακτικές (key, BPM, ενέργεια).</p><p id="ez_st" class="mu"></p><button class="sm hide" id="ez_skip" data-ez="skip">⏭ Παράλειψη ανάλυσης</button>`;
+  let cur=-1;r.items.forEach((x,i)=>{if(x.ph!==cur){cur=x.ph;const mk=r.marks[cur],ph=r.phases[cur];h+=`<div class="rrow" style="margin-top:14px;padding:6px 8px;border-left:6px solid ${PHC(cur)};background:var(--bg);border-radius:8px"><b>${esc(mk.p.name)}</b><span class="mu">${st?clk(st,mk.s)+"–"+clk(st,mk.e):hms(mk.s)+"–"+hms(mk.e)} · ${ph.n} τρ.</span><span style="margin-left:auto"><button class="sm" data-ez="plk" data-p="${cur}" title="Κλείδωμα όλης της φάσης">${lk.ph.has(cur)?"🔒":"🔓"} φάση</button> <button class="sm" data-ez="preg" data-p="${cur}" title="Νέα επιλογή μόνο για αυτή τη φάση">🔄 Άλλαξε τη φάση</button></span></div>`}
+   const L=lk.tr.has(x.t)||lk.ph.has(x.ph);
+   h+=`<div class="mr"${L?' style="background:var(--ac2)"':""}><span class="mu" style="min-width:46px">${st?clk(st,x.start):hms(x.start)}</span><span class="ell"><b>${esc(x.t.title||x.t.fname)}</b> <span class="mu">${esc(x.t.artist||"")}</span><br><small class="mu"><span class="chip">${esc(padCam(x.t.cam))}</span><span class="chip">${Math.round(x.t.bpm)} BPM${x.bx&&Math.abs(x.bx-x.t.bpm)>.5?` ≈${Math.round(x.bx)}`:""}</span><span class="chip">⚡${Math.round(x.e)}</span>${x.br?'<span class="chip">🌉 γέφυρα BPM</span>':""}${i&&x.score!=null?`<span class="chip">${x.score}% μετάβαση</span>`:""}</small></span><button class="sm" data-ez="lk" data-i="${i}" title="Κλείδωμα τραγουδιού">${lk.tr.has(x.t)?"🔒":"🔓"}</button><button class="sm" data-ez="alt" data-i="${i}" title="Εναλλακτικές">🔁</button></div><div class="hide" data-alt="${i}"></div>`});
+  return h+`<div class="mt" style="margin-top:16px"><button class="big" data-ez="play" style="padding:11px 22px">▶ Παίξε το σετ</button><button class="sm" data-ez="savepl">💾 Αποθήκευση ως playlist</button><button class="sm" data-ez="m3u">⬇ M3U</button><button class="sm" data-ez="csv">⬇ CSV</button></div><div class="mt"><button class="sm" data-ez="again">🔀 Νέα εκδοχή (κρατά τα 🔒)</button><button class="sm" data-ez="restart">↩ Από την αρχή</button></div>`}};
+const ezNav=s=>s>=8?"":`<div class="ez-nav"><span>${s>1?`<button class="sm" data-ez="back" style="padding:11px 18px">◀ Πίσω</button>`:""}</span><span>${s<7?`<button class="big" data-ez="next" style="padding:11px 24px">Συνέχεια ▶</button>`:""}</span></div>`;
+const ezDraw=()=>{const r=document.getElementById("ez_root");if(!r)return;const s=EZ.step;r.innerHTML=`<div class="ez-pr">${[1,2,3,4,5,6,7].map(i=>`<i class="${i<=s?"on":""}"></i>`).join("")}</div><div class="mu" style="font-size:12px">${s<8?`Βήμα ${s} από 7`:"Έτοιμο!"}</div>`+ezScr[s]()+ezNav(s);try{localStorage.setItem("mlez",JSON.stringify({hours:EZ.hours,st:EZ.st,tpl:EZ.tpl,ht:EZ.ht,br:EZ.br,ma:EZ.ma,an:EZ.an,sm:EZ.sm}))}catch(e){}};
+/* generation: analysis → planner → mix points. o.only = regenerate just that phase; locks come from WZ.lk */
+async function ezGenerate(o={}){const P=ezP().map(p=>({...p})),st=x=>{const e=document.getElementById("ez_st");if(e)e.textContent=x},sk=document.getElementById("ez_skip");EZ.skip=false;EZ.busy=true;if(sk)sk.classList.remove("hide");
+ try{const base=ezBase();if(!base.length){st("⚠ Δεν βρέθηκε μουσική με αρχείο στην πηγή που επέλεξες.");return null}
+  if(EZ.an){const miss=shuffled(base.filter(t=>!t.cam||!t.bpm)).slice(0,250);for(let i=0;i<miss.length&&!EZ.skip;i++){st(`🎼 Ανάλυση key/BPM ${i+1}/${miss.length}…`);await analyzeFile(miss[i],{key:!miss[i].cam,bpm:!miss[i].bpm})}if(miss.length)render()}
+  EZ.skip=false;const ht=EZ.ht,free=P.some(p=>!p.b1&&!p.b2),lo=free?0:Math.min(...P.map(p=>p.b1||999)),hi=free?999:Math.max(...P.map(p=>p.b2||0)),pool=base.filter(t=>camP(t.cam)&&t.bpm&&bpmIn(t.bpm,lo,hi,ht));
+  if(!pool.length){st("⚠ Δεν βρέθηκαν τραγούδια με key και BPM μέσα στα όρια των φάσεων. Βγάλε τα όρια BPM ή άφησε ενεργή την ανάλυση.");return null}
+  let fixed=null,must=null;{const L=WZ.last,lk=WZ.lk;if(L&&L.marks.length!==P.length)WZ.lk=newLk();else if(L&&(lk.ph.size||lk.tr.size||o.only!==undefined)){fixed=new Map();must=new Map();L.items.forEach(x=>{const p=x.ph;if(o.only!==undefined?p!==o.only:lk.ph.has(p)){if(!fixed.has(p))fixed.set(p,[]);fixed.get(p).push(x.t)}else if(lk.tr.has(x.t))must.set(x.t,p)});
+   const lt=new Set();fixed.forEach(a=>a.forEach(t=>lt.add(t)));must.forEach((v,t)=>lt.add(t));lt.forEach(t=>{if(!pool.includes(t))pool.push(t)})}}
+  const need=pool.filter(t=>energyOf(t)==null);
+  if(EZ.an&&need.length){const part=shuffled(need).slice(0,250);for(let i=0;i<part.length&&!EZ.skip;i++){st(`⚡ Ανάλυση ενέργειας ${i+1}/${part.length}…`);await analyzeEnergy(part[i]);if(i%10===9)await new Promise(r=>setTimeout(r))}energyRecalc()}
+  EZ.skip=false;const en=new Map(),est=new Set(),bs=pool.map(t=>t.bpm).sort((a,b)=>a-b);
+  pool.forEach(t=>{let e=energyOf(t);if(e==null){let q=0;while(q<bs.length&&bs[q]<t.bpm)q++;e=Math.round(1+9*q/Math.max(1,bs.length-1));est.add(t)}en.set(t,e)});
+  const b1=Math.round(bs[Math.floor(bs.length*.1)]||100);let b2=Math.round(bs[Math.floor(bs.length*.9)]||130);if(b2<=b1)b2=b1+20;
+  st("🧭 Στήνω το σετ…");
+  const r=planSet(pool,{phases:P,energy:en,est,b1,b2,jump:6,startKey:"",keyStep:1.5,climbEvery:12,mood:false,moodGap:6,maxA:EZ.ma?2:0,gap:EZ.ma?5:0,rz:4,recent:true,ht,bridge:EZ.br,brMin:14,fixed,must});
+  if(!r||!r.mix.length){st("⚠ Δεν βρέθηκε σετ με αυτές τις ρυθμίσεις.");return null}
+  const fc={fout:6,fin:4,ov:true,trimS:false,trimE:false,smart:EZ.sm,thr:-50};EZ.fc=fc;WZ.per=new Map();
+  r.items.forEach(x=>{const ph=P[x.ph],mx=ph&&MXS[ph.mx];if(mx)WZ.per.set(x.t,{...mx,smart:mx.smart&&EZ.sm})});
+  if(EZ.sm)await djPts(r.mix,fc,msg=>st(msg),()=>EZ.skip);
+  WZ.last=r;WZ.ctx={pool,en,est,jump:6,ht};WZ.st=EZ.st;st("");return r}
+ catch(e){console.error(e);st("⚠ Σφάλμα: "+(e&&e.message||e));return null}
+ finally{EZ.busy=false;if(sk)sk.classList.add("hide")}}
+function easyModal(){const m=$("modal");m.classList.remove("hide");
+ if(!EZ.init){let sv={};try{sv=JSON.parse(localStorage.getItem("mlez")||"{}")}catch(e){}Object.assign(EZ,{init:1,step:1,hours:sv.hours||2,st:sv.st||"",tpl:EZT.some(x=>x.k===sv.tpl)?sv.tpl:"classic",src:"",ht:!!sv.ht,br:sv.br!==false,ma:sv.ma!==false,an:sv.an!==false,sm:sv.sm!==false,phases:null})}
+ m.innerHTML=`<div class="mc" style="max-width:720px"><div class="mh"><h2>✨ Εύκολος οδηγός σετ</h2><button class="x">×</button></div><div id="ez_root"></div></div>`;
+ const rep=async o=>{if(EZ.busy)return;await ezGenerate(o);if(EZ.step===8||WZ.last)EZ.step=8;ezDraw()};
+ m.ondragstart=e=>{const b=e.target.closest&&e.target.closest("#ez_tl .tlb[draggable]");if(b){EZ.drag=+b.dataset.i;try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(EZ.drag))}catch(x){}}};
+ m.ondragover=e=>{if(e.target.closest&&e.target.closest("#ez_tl"))e.preventDefault()};
+ m.ondrop=e=>{const b=e.target.closest&&e.target.closest("#ez_tl .tlb");if(!b||EZ.drag==null)return;e.preventDefault();const to=+b.dataset.i,from=EZ.drag;EZ.drag=null;if(from===to)return;const P=ezP(),q=P.splice(from,1)[0];P.splice(to,0,q);ezDraw()};
+ m.oninput=null;
+ m.onchange=e=>{const t=e.target;if(!document.getElementById("ez_root"))return;
+  if(t.id==="ez_h"){EZ.hours=Math.max(.5,Math.min(24,+t.value||2));EZ.phases=null;ezDraw()}
+  else if(t.id==="ez_t"){EZ.st=t.value;ezDraw()}
+  else if(t.dataset&&t.dataset.ezi==="pm"){ezP()[+t.dataset.i].min=Math.max(1,+t.value||1);ezDraw()}
+  else if(t.dataset&&t.dataset.ezi==="pg"){ezP()[+t.dataset.i].g=t.value;ezDraw()}};
+ m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const b=e.target.closest("[data-ez]");if(!b||!document.getElementById("ez_root"))return;const a=b.dataset.ez,v=b.dataset.v;
+  if(a==="skip"){EZ.skip=true;return}
+  if(EZ.busy)return;
+  if(a==="back"){EZ.step=Math.max(1,EZ.step-1);ezDraw()}
+  else if(a==="next"){if(EZ.step===4&&!T.some(t=>t.file)){toast("Πρόσθεσε πρώτα τους φακέλους με τη μουσική (📚)");return}EZ.step=Math.min(7,EZ.step+1);ezDraw()}
+  else if(a==="hrs"){EZ.hours=+v;EZ.phases=null;ezDraw()}
+  else if(a==="st"){EZ.st=v;ezDraw()}
+  else if(a==="tpl"){EZ.tpl=v;EZ.phases=null;EZ.ht=!!(EZT.find(x=>x.k===v)||{}).ht;ezDraw()}
+  else if(a==="src"){EZ.src=v;ezDraw()}
+  else if(a==="tog"){EZ[v]=!EZ[v];ezDraw()}
+  else if(a==="pup"||a==="pdn"){const P=ezP(),i=+b.dataset.i,j=a==="pup"?i-1:i+1;if(j>=0&&j<P.length){[P[i],P[j]]=[P[j],P[i]];ezDraw()}}
+  else if(a==="pbf"){const p=ezP()[+b.dataset.i];p.b1=0;p.b2=0;ezDraw()}
+  else if(a==="go"){b.disabled=true;WZ.lk=newLk();WZ.last=null;const r=await ezGenerate();if(r){EZ.step=8;ezDraw()}else b.disabled=false}
+  else if(a==="lk"&&WZ.last){const t=WZ.last.items[+b.dataset.i].t;if(WZ.lk.tr.has(t))WZ.lk.tr.delete(t);else WZ.lk.tr.add(t);ezDraw()}
+  else if(a==="plk"&&WZ.last){const q=+b.dataset.p;if(WZ.lk.ph.has(q))WZ.lk.ph.delete(q);else WZ.lk.ph.add(q);ezDraw()}
+  else if(a==="preg"&&WZ.last)rep({only:+b.dataset.p});
+  else if(a==="again")rep({});
+  else if(a==="restart"){WZ.lk=newLk();WZ.last=null;EZ.step=1;EZ.phases=null;ezDraw()}
+  else if(a==="alt"&&WZ.last){const k0=+b.dataset.i,box=m.querySelector(`[data-alt="${k0}"]`);if(!box)return;if(!box.classList.contains("hide")){box.classList.add("hide");return}
+   m.querySelectorAll("[data-alt]").forEach(el=>el.classList.add("hide"));const L=wzAlt(k0);WZ.alts=L;
+   box.innerHTML=L.length?`<div style="margin:2px 0 8px 46px;padding:6px 8px;border:1px dashed var(--bd);border-radius:8px"><div class="mu" style="font-size:12px">Συμβατό key, BPM και ενέργεια — πάτα για αντικατάσταση:</div>`+L.map((o2,k)=>`<button class="sm" data-ez="swap" data-i="${k0}" data-k="${k}" style="display:block;width:100%;text-align:left;margin-top:4px">${esc(o2.c.artist?o2.c.artist+" – ":"")}${esc(o2.c.title||o2.c.fname)} <span class="mu">· ${esc(padCam(o2.c.cam))} · ${Math.round(o2.c.bpm)} BPM · E${Math.round(o2.e)}</span></button>`).join("")+`</div>`:`<p class="mu" style="margin:2px 0 8px 46px">Δεν βρέθηκαν συμβατές εναλλακτικές.</p>`;box.classList.remove("hide")}
+  else if(a==="swap"&&WZ.last&&WZ.alts){const o2=WZ.alts[+b.dataset.k];if(o2){wzSwap(+b.dataset.i,o2.c);ezDraw();toast("Το τραγούδι αντικαταστάθηκε")}}
+  else if(a==="play"&&WZ.last){const fc=EZ.fc||{fout:6,fin:4,ov:true,trimS:false,trimE:false,smart:false,thr:-50};m.classList.add("hide");shuf=false;$("pshuf").classList.remove("on");const pr=WZ.per&&WZ.per.size?WZ.per:null;pendingAMX=fxAny(fc)||pr?{...fc,per:pr,anySm:!!pr&&[...pr.values()].some(x=>x.smart)}:null;startQ(WZ.last.mix,WZ.last.mix[0],0);if(S.queue!=="never")openQ(true);toast(`Σετ: ${WZ.last.mix.length} τραγούδια · ${hms(WZ.last.tot)}`)}
+  else if(a==="savepl"&&WZ.last){const p=newPL("Set "+dstr());addToPL(WZ.last.mix,p);toast("Αποθηκεύτηκε η playlist: "+p.name)}
+  else if(a==="m3u"&&WZ.last){let pf="";try{pf=localStorage.getItem("mlprefix")||""}catch(x){}const r=exportBuild(WZ.last.mix,{fmt:"m3u8",mode:pf?"abs":"rel",prefix:pf,meta:true});wzDl("Set_"+new Date().toISOString().slice(0,10)+".m3u8",r.text,r.mime);toast("✅ Το M3U κατέβηκε")}
+  else if(a==="csv"&&WZ.last){wzDl("Set_"+new Date().toISOString().slice(0,10)+".csv",wzCsv(WZ.last),"text/csv");toast("✅ Το CSV κατέβηκε")}};
+ ezDraw()}
+
 /* ===== Dj mode: one entry point, five tabs ===== */
-let djTab="am";const DJT=[["am","🎛 Automix"],["sm","🧠 Smart Mix"],["wz","🧭 Wizard σετ"],["sg","🔮 Επόμενο τραγούδι"],["pl","🎶 Playlists"]];
-function djModal(tab,arg){djTab=tab||djTab;({am:()=>automixModal(),sm:()=>smartMixModal(arg),wz:()=>wizardModal(),sg:()=>sugModal(),pl:()=>plModal(arg)})[djTab]()}
+let djTab="am";const DJT=[["ez","✨ Εύκολος οδηγός"],["am","🎛 Automix"],["sm","🧠 Smart Mix"],["wz","🧭 Wizard σετ"],["sg","🔮 Επόμενο τραγούδι"],["pl","🎶 Playlists"]];
+function djModal(tab,arg){djTab=tab||djTab;({ez:()=>easyModal(),am:()=>automixModal(),sm:()=>smartMixModal(arg),wz:()=>wizardModal(),sg:()=>sugModal(),pl:()=>plModal(arg)})[djTab]()}
 function djAddTabs(act){djTab=act;const m=$("modal"),mc=m.querySelector(".mc");if(!mc||m.classList.contains("hide"))return;mc.classList.add("dj");const h=mc.querySelector(".mh");if(!h)return;
  const bar=document.createElement("div");bar.className="mt dj-tabs";bar.innerHTML=DJT.map(([k,l])=>`<button class="sm ${k===act?"on":""}" data-dj="${k}">${l}</button>`).join("");h.insertAdjacentElement("afterend",bar);
  bar.querySelectorAll("button").forEach(b=>b.onclick=e=>{e.stopPropagation();djModal(b.dataset.dj)})}
@@ -2238,6 +2381,7 @@ smartMixModal=(f=>function(){f.apply(this,arguments);djAddTabs("sm")})(smartMixM
 wizardModal=(f=>function(){f.apply(this,arguments);djAddTabs("wz")})(wizardModal);
 sugModal=(f=>function(){f.apply(this,arguments);djAddTabs("sg")})(sugModal);
 plModal=(f=>function(){f.apply(this,arguments);djAddTabs("pl")})(plModal);
+easyModal=(f=>function(){f.apply(this,arguments);djAddTabs("ez")})(easyModal);
 document.head.appendChild(Object.assign(document.createElement("style"),{textContent:".dj-tabs{margin:10px 0 14px}.mc.dj{max-width:720px!important}"}));
 /* ===== v23: keep the UI responsive while background work runs ===== */
 let LAG=0,WEBDIRTY=false,lastWebSave=0;
