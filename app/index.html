@@ -1033,9 +1033,9 @@ async function analyzePoints(t,thrDb){if(!t||!t.file||(S.hifi&&cur&&!au.paused))
   if(t.bpm){const bar=240/t.bpm;if(bar>.8&&bar<6){if(outro<en){outro=st+Math.round((outro-st)/bar)*bar;if(outro>en)outro-=bar}intro=st+Math.ceil((intro-st)/bar)*bar}}
   const r2=x=>Math.round(x*100)/100;t.pts={s:r2(st),e:r2(en),i:r2(intro),o:r2(outro),d:r2(dur),th:thrDb};idbDirty=true;return t.pts}catch(x){return null}}
 const amNext=()=>rep===2?null:(qi+1<Q.length?Q[qi+1]:(rep===1&&Q.length>1?Q[0]:null));
-function amWarm(){if(!AMX||S.hifi||!(AMX.trimS||AMX.trimE||AMX.smart))return;for(const t of [cur,Q[qi+1],Q[qi+2]]){if(!t||!t.file||PTSB.has(t)||(t.pts&&t.pts.th===AMX.thr))continue;PTSB.add(t);analyzePoints(t,AMX.thr).finally(()=>PTSB.delete(t))}}
+function amWarm(){if(!AMX||S.hifi||!(AMX.trimS||AMX.trimE||AMX.smart||AMX.anySm))return;for(const t of [cur,Q[qi+1],Q[qi+2]]){if(!t||!t.file||PTSB.has(t)||(t.pts&&t.pts.th===AMX.thr))continue;PTSB.add(t);analyzePoints(t,AMX.thr).finally(()=>PTSB.delete(t))}}
 /* transition plan for the current track: T = where the fade-out starts, L = fade length, end = where the track stops */
-function amCalc(){const c=cur,A=AMX;if(!c||!au.duration)return null;const n=amNext(),pc=c.pts,dur=au.duration;
+function amCalc(){const c=cur,A0=AMX;if(!c||!au.duration)return null;const A=A0.per&&A0.per.get(c)?{...A0,...A0.per.get(c)}:A0;const n=amNext(),pc=c.pts,dur=au.duration;
  let end=A.trimE&&pc?Math.min(dur,Math.max(pc.e,1)):dur,L=Math.max(0,Math.min(+A.fout||0,end/3)),fi=Math.max(0,+A.fin||0),T;
  if(n&&A.smart&&pc){const sc=mixScore(c,n,false);L*=sc>=80?1:sc>=60?.7:.4;if(+A.fout>0)L=Math.max(Math.min(2,+A.fout),L);fi=Math.min(fi,Math.max(2,L))}
  if(n&&A.smart&&pc&&pc.o&&pc.o<end&&end-pc.o>=L&&pc.o>dur*.3){T=pc.o;end=Math.min(end,T+L)}else T=end-L;
@@ -1388,7 +1388,7 @@ function renderQ(){const rest=Q.slice(Math.max(qi,0)).reduce((a,t)=>a+(t.dur||0)
  if(!$("fs").classList.contains("hide")){$("fsqh").innerHTML=Q.length?`<span>Ουρά αναπαραγωγής · ${hdr}</span> <button class="sm" id="fsqhide" title="Απόκρυψη λίστας">🙈 Απόκρυψη</button>`:"";if($("fsqhide"))$("fsqhide").onclick=()=>toggleFsq();$("fsq").innerHTML=qHTML();bindQ($("fsq"))}}
 function openQ(show){$("qpanel").classList.toggle("hide",!show);$("app").classList.toggle("hasq",show);if(show)renderQ()}
 $("pq").onclick=()=>openQ($("qpanel").classList.contains("hide"));
-{const _cue=cue;cue=function(i){if(!xfCue)ghKill();amFired=false;amSt=0;amFiCur=AMX?+AMX.fin||0:0;_cue(i);if(fadeSec||(AMX&&amFiCur>0))au.volume=.05;else if(AMX)au.volume=1;amWarm();if(V.where!=="off"||S.wave)vizLoadPcm(cur);syncPlayer();renderQ();fsUpdate();if(S.autoFS&&$("fs").classList.contains("hide"))openFS()};const _bq=buildQ;buildQ=function(f){_bq(f);renderQ()};const _sq=startQ;startQ=function(l,t,f){if(!relinkSkip&&!relinkBusy&&DIRS.length&&((t&&!t.file)||(!t&&!l.some(x=>x.file)))){relinkBusy=true;syncDirs(DIRS,true).finally(()=>{relinkBusy=false;relinkSkip=true;try{startQ(l,t,f)}finally{relinkSkip=false}});return}_sq(l,t,f);if(Q.length>1&&(S.queue==="always"||(S.queue==="playlist"&&selPL)))openQ(true)}}
+{const _cue=cue;cue=function(i){if(!xfCue)ghKill();amFired=false;amSt=0;amFiCur=AMX?(AMX.per&&cur&&AMX.per.get(cur)?+AMX.per.get(cur).fin||0:+AMX.fin||0):0;_cue(i);if(fadeSec||(AMX&&amFiCur>0))au.volume=.05;else if(AMX)au.volume=1;amWarm();if(V.where!=="off"||S.wave)vizLoadPcm(cur);syncPlayer();renderQ();fsUpdate();if(S.autoFS&&$("fs").classList.contains("hide"))openFS()};const _bq=buildQ;buildQ=function(f){_bq(f);renderQ()};const _sq=startQ;startQ=function(l,t,f){if(!relinkSkip&&!relinkBusy&&DIRS.length&&((t&&!t.file)||(!t&&!l.some(x=>x.file)))){relinkBusy=true;syncDirs(DIRS,true).finally(()=>{relinkBusy=false;relinkSkip=true;try{startQ(l,t,f)}finally{relinkSkip=false}});return}_sq(l,t,f);if(Q.length>1&&(S.queue==="always"||(S.queue==="playlist"&&selPL)))openQ(true)}}
 $("am_go")&&0;
 function fsUpdate(){if($("fs").classList.contains("hide"))return;const t=cur;if(!t)return;
  $("fscv").style.backgroundImage=t.cover?`url(${t.cover})`:"";$("fscv").classList.toggle("vinyl",!t.cover);
@@ -2049,7 +2049,16 @@ const WZT={"2h":["Κλασικό 2 ωρών",[["Warm-up",30,3,5,"auto"],["Build-
  "3h":["Μακρύ 3 ωρών",[["Warm-up",45,2,4,"auto"],["Build-up",45,4,7,"auto"],["Peak",60,8,9,"hold"],["Cool-down",30,7,3,"auto"]]],
  "peak":["Peak-time 90'",[["Build-up",20,6,8,"auto"],["Peak",50,8,9,"hold"],["Outro",20,8,6,"auto"]]],
  "wave":["Δύο κορυφές 2 ωρών",[["Warm-up",20,3,5,"auto"],["Peak A",25,7,9,"hold"],["Break",20,9,5,"auto"],["Peak B",35,7,9,"hold"],["Cool-down",20,8,4,"auto"]]]};
-const tplPh=k=>WZT[k][1].map(([name,min,e0,e1,key])=>({name,min,e0,e1,key}));
+const tplPh=k=>WZT[k][1].map(([name,min,e0,e1,key,g,b1,b2,mx])=>({name,min,e0,e1,key,g:g||"",b1:b1||0,b2:b2||0,mx:mx||"auto"}));
+WZT.mega=["Πολύωρο ταξίδι 5ω40΄ (chill → techno → reggae → rock)",[["Warm-up",20,2,3,"auto","chill",80,112,"blend"],["Build-up",40,4,6,"auto","progressive",118,126,"smooth"],["Peak",50,8,9,"hold","techno",128,140,"club"],["Cool-down",20,6,4,"auto","deep house",118,124,"smooth"],["Build dub",40,4,6,"auto","dub",60,100,"smooth"],["Reggae",140,5,7,"auto","reggae",60,100,"smooth"],["Γέφυρα rock",30,6,8,"auto","rock",90,150,"fade"]]];
+WZT.genres4=["Ταξίδι ειδών 4ω (chill → deep → tech → techno)",[["Chill",30,2,3,"auto","chill",80,112,"blend"],["Deep house",50,4,6,"auto","deep house",118,124,"smooth"],["Tech house",60,6,8,"auto","tech house",122,128,"smooth"],["Techno peak",60,8,9,"hold","techno",128,140,"club"],["Outro",40,7,3,"auto","deep house",118,124,"blend"]]];
+/* per-phase mix style: used instead of the general transition settings when a phase picks one */
+const MXS={blend:{n:"Μακρύ blend 16΄΄ (chill / deep)",fout:16,fin:12,ov:true,smart:true},smooth:{n:"Smooth crossfade 8΄΄",fout:8,fin:6,ov:true,smart:true},
+ club:{n:"Tight beatmix 4΄΄ (house / techno)",fout:4,fin:3,ov:true,smart:true},cut:{n:"Γρήγορο cut 1΄΄ (rock / dub)",fout:1,fin:.5,ov:true,smart:false},
+ fade:{n:"Fade out → fade in, χωρίς επικάλυψη (γέφυρα)",fout:6,fin:4,ov:false,smart:false}};
+const MXO=[["auto","Μίξη: γενικές ρυθμίσεις"],...Object.entries(MXS).map(([k,v])=>[k,v.n])];
+const gTerms=s=>String(s||"").split(/[,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+const gMatch=(t,terms)=>!terms.length||(t.genres||[]).some(g=>{g=String(g).toLowerCase();return terms.some(x=>g.includes(x))});
 
 /* --- energy: tag ("Energy 7" from Mixed In Key) > manual > auto (estimated from audio with the 4 criteria of the guide) --- */
 const tagEnergy=t=>{const m=/\benergy\W{0,3}(\d{1,2})\b/i.exec(String(t.comment||""));const n=m?+m[1]:0;return n>=1&&n<=10?n:0};
@@ -2077,33 +2086,35 @@ function energyRecalc(){const A=T.filter(t=>t.esrc==="auto"&&t.eraw>0);if(!A.len
 function planSet(pool,cfg){const rnd=cfg.rand||Math.random,now=Date.now(),ph=(cfg.phases||[]).filter(p=>p.min>0);if(!ph.length)return null;
  const lowS2=x=>String(x==null?"":x).toLowerCase(),ak=t=>lowS2(t.artist),total=ph.reduce((a,p)=>a+p.min*60,0),marks=[];let acc=0;ph.forEach((p,i)=>{marks.push({i,p,s:acc,e:acc+p.min*60});acc+=p.min*60});
  const at=s=>marks.find(m=>s<m.e)||marks[marks.length-1],tgt=s=>{const m=at(s),k=Math.max(0,Math.min(1,(s-m.s)/(m.e-m.s)));return m.p.e0+(m.p.e1-m.p.e0)*k},
-  bpmT=e=>cfg.b1+(cfg.b2-cfg.b1)*Math.max(0,Math.min(1,(e-1)/9)),en=cfg.energy,est=cfg.est||new Set(),jump=+cfg.jump||6,wE=cfg.wE||11,rz=cfg.rz==null?4:+cfg.rz,gap=cfg.gap==null?3:+cfg.gap,maxA=+cfg.maxA||0;
+  bpmT=(e,p)=>{const b1=p&&p.b1||cfg.b1,b2=p&&p.b2||cfg.b2;return b1+(b2-b1)*Math.max(0,Math.min(1,(e-1)/9))},en=cfg.energy,est=cfg.est||new Set(),jump=+cfg.jump||6,wE=cfg.wE||11,rz=cfg.rz==null?4:+cfg.rz,gap=cfg.gap==null?3:+cfg.gap,maxA=+cfg.maxA||0;
  let left=pool.filter(t=>camP(t.cam)&&en.has(t)),sumD=0;left.forEach(t=>sumD+=t.dur||300);const avgD=left.length?sumD/left.length:300,
   startN=cfg.startKey?camP(cfg.startKey):null;
- const mix=[],items=[],cnt=new Map(),warn=[];let tot=0,last=null,kpos=startN?startN.n:8,prevT=null,prevS=0,sinceSw=99;
+ const mix=[],items=[],cnt=new Map(),warn=[],fbG=new Set(),fbB=new Set();let tot=0,last=null,kpos=startN?startN.n:8,prevT=null,prevS=0,sinceSw=99;
  const MV={same:14,"+1":13,"-1":13,switch:6,"+-2":2,diag:-8,clash:-60,unk:0};
  while(left.length&&tot<total-45){const sec=Math.min(total-1,tot+avgD/2),et=tgt(sec),phs=at(sec).p;
   if(prevT!==null){const dt=(sec-prevS)/60;if(phs.key==="auto")kpos+=(et-prevT)/(cfg.keyStep||1.5);else if(phs.key==="climb")kpos+=dt/(cfg.climbEvery||12);else if(phs.key==="descend")kpos-=dt/(cfg.climbEvery||12)}
   prevT=et;prevS=sec;const tn=((Math.round(kpos)-1)%12+12)%12+1,moodNow=!!(cfg.mood&&last&&sinceSw>=(cfg.moodGap||6)&&rnd()<.45),
    recent=new Set(gap?mix.slice(-gap).map(ak).filter(Boolean):[]);
-  const pick=lvl=>{let best=null,bs=-1e9,bm=null;for(const c of left){const a=ak(c);if(maxA&&a&&(cnt.get(a)||0)>=maxA)continue;const e=en.get(c),de=Math.abs(e-et),cp=camP(c.cam),mv=last?camMove(last.cam,c.cam):{k:"same"};
+  const gt=gTerms(phs.g),pb1=+phs.b1||0,pb2=+phs.b2||0,lpI=items.length?items[items.length-1].ph:-1,pch=lpI>=0&&marks[lpI].p!==phs&&((marks[lpI].p.g||"")!==(phs.g||"")||(marks[lpI].p.b1||0)!==pb1||(marks[lpI].p.b2||0)!==pb2);
+  const pick=(lvl,md)=>{let best=null,bs=-1e9,bm=null;for(const c of left){if(md<2&&gt.length&&!gMatch(c,gt))continue;if(md<1&&c.bpm&&((pb1&&c.bpm<pb1)||(pb2&&c.bpm>pb2)))continue;const a=ak(c);if(maxA&&a&&(cnt.get(a)||0)>=maxA)continue;const e=en.get(c),de=Math.abs(e-et),cp=camP(c.cam),mv=last?camMove(last.cam,c.cam):{k:"same"};
     if(lvl===0&&(mv.k==="clash"||de>3))continue;if(lvl===1&&(mv.k==="clash"||de>4.5))continue;
     let s=MV[mv.k]||0;if(moodNow&&mv.k==="switch")s+=28;else if(mv.k==="switch")s-=6;
     const dn=Math.min((cp.n-tn+12)%12,(tn-cp.n+12)%12);s+=dn===0?18:dn===1?6:dn===2?-6:-dn*5;
     s-=de*wE+(de>2.5?(de-2.5)*12:0);if(est.has(c))s-=6;
-    if(last&&last.bpm&&c.bpm){const g=Math.abs(last.bpm-c.bpm),lim=jump*(lvl===0?1:lvl===1?1.6:99);s-=g>lim?40+g*3:g*1.2}
-    if(c.bpm)s-=Math.abs(c.bpm-bpmT(et))*.35;
+    if(last&&last.bpm&&c.bpm){const g=Math.abs(last.bpm-c.bpm),lim=jump*(lvl===0?1:lvl===1?1.6:99);if(!pch)s-=g>lim?40+g*3:g*1.2}
+    if(c.bpm)s-=Math.abs(c.bpm-bpmT(et,phs))*.35;
     if(last)s+=mixScore(last,c,true)*.25;
     if(a&&recent.has(a))s-=25;if(cfg.recent&&c.last&&now-c.last<432e5)s-=12;
     if(!last&&startN)s+=dn===0&&cp.l===startN.l?10:0;
     s+=rnd()*rz;if(s>bs){bs=s;best=c;bm=mv}}return best?{c:best,mv:bm}:null};
-  const r=pick(0)||pick(1)||pick(2);if(!r)break;const c=r.c,mv=r.mv,cp=camP(c.cam);
+  let r=null,fbm=0;for(let md=0;md<3&&!r;md++){r=pick(0,md)||pick(1,md)||pick(2,md);fbm=md}if(!r)break;if(fbm===1&&(pb1||pb2))fbB.add(at(sec).i);if(fbm===2&&gt.length)fbG.add(at(sec).i);const c=r.c,mv=r.mv,cp=camP(c.cam);
   items.push({t:c,start:tot,mid:tot+(c.dur||300)/2,ph:at(tot+1).i,mv,e:en.get(c),et,dbpm:last&&last.bpm&&c.bpm?Math.round((c.bpm-last.bpm)*10)/10:0,
    score:last?mixScore(last,c,true):null,est:est.has(c)});
   if(Math.abs(cp.n-Math.round(kpos))>=2)kpos=cp.n;
   sinceSw=mv.k==="switch"?0:sinceSw+1;cnt.set(ak(c),(cnt.get(ak(c))||0)+1);mix.push(c);tot+=c.dur||300;left.splice(left.indexOf(c),1);last=c}
  if(tot<total*.85)warn.push(`Το σετ βγήκε ${Math.round(tot/60)}΄ αντί για ${Math.round(total/60)}΄ — δεν υπάρχουν αρκετά τραγούδια που να ταιριάζουν. Διεύρυνε το εύρος BPM, το είδος ή ανάλυσε περισσότερα τραγούδια.`);
- const phases=marks.map(m=>{const it=items.filter(x=>x.ph===m.i);return{name:m.p.name,min:m.p.min,s:m.s,e:m.e,n:it.length,key:m.p.key,
+ marks.forEach(m=>{const p=m.p;if(fbG.has(m.i))warn.push(`Φάση «${p.name}»: δεν βρέθηκαν αρκετά τραγούδια με είδος «${p.g}» — συμπληρώθηκε με άλλα είδη.`);if(fbB.has(m.i))warn.push(`Φάση «${p.name}»: δεν υπήρχαν αρκετά τραγούδια στο εύρος BPM ${p.b1||"…"}–${p.b2||"…"} — χαλάρωσα το εύρος.`)});
+ const phases=marks.map(m=>{const it=items.filter(x=>x.ph===m.i);return{name:m.p.name,g:m.p.g||"",mx:m.p.mx||"auto",min:m.p.min,s:m.s,e:m.e,n:it.length,key:m.p.key,
   avgE:it.length?it.reduce((a,x)=>a+x.e,0)/it.length:0,avgT:it.length?it.reduce((a,x)=>a+x.et,0)/it.length:0,keys:it.map(x=>x.t.cam)}});
  const sc=items.filter(x=>x.score!=null).map(x=>x.score);
  return{mix,items,marks,phases,total,tot,warn,avg:sc.length?Math.round(sc.reduce((a,b)=>a+b,0)/sc.length):0,
@@ -2127,16 +2138,16 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
  let sv={};try{sv=JSON.parse(localStorage.getItem("mlwiz")||"{}")}catch(e){}
  const st=sv.style&&WZS[sv.style]?sv.style:"deep",S0=WZS[st];WZ.phases=Array.isArray(sv.phases)&&sv.phases.length?sv.phases:tplPh("2h");WZ.skip=false;
  m.innerHTML=`<div class="mc" style="max-width:720px"><div class="mh"><h2>🧭 Wizard σχεδιασμού σετ</h2><button class="x">×</button></div>
- <div class="mt wz-pills">${["1 · Στυλ & πηγή","2 · Φάσεις & keys","3 · Ενέργεια & κανόνες","4 · Αποτέλεσμα"].map((l,i)=>`<button class="sm" data-a="step" data-n="${i+1}">${l}</button>`).join("")}</div>
+ <div class="mt wz-pills">${["1 · Στυλ & πηγή","2 · Φάσεις, είδη & mix","3 · Ενέργεια & κανόνες","4 · Αποτέλεσμα"].map((l,i)=>`<button class="sm" data-a="step" data-n="${i+1}">${l}</button>`).join("")}</div>
  <div class="wz-s" data-n="1">
   <label class="fld"><span class="mu">Στυλ</span><select id="wz_sty">${opt(Object.entries(WZS).map(([k,v])=>[k,v.n+(k==="custom"?"":k==="techno"?` · ${v.b1}+ BPM`:` · ${v.b1}–${v.b2} BPM`)]),st)}</select></label>
   <p class="mu" id="wz_note" style="margin:0 0 10px">${S0.note}</p>
   <div class="rrow"><span class="mu">BPM</span><input id="wz_b1" type="number" value="${sv.b1||S0.b1}" style="width:70px"><span class="mu">έως</span><input id="wz_b2" type="number" value="${sv.b2||S0.b2}" style="width:70px"><span class="mu">Μέγιστο άλμα BPM ανά μετάβαση</span><select id="wz_j">${opt([2,3,4,6,8,10].map(v=>[v,"±"+v]),sv.jump||S0.j)}</select></div>
   <label class="fld"><span class="mu">Πηγή</span><select id="wz_src"><option value="">Ολόκληρη η βιβλιοθήκη</option>${PL.map(x=>`<option value="${x.id}"${x.id===selPL?" selected":""}>${x.smart?"✨":"🎶"} ${esc(x.name)}</option>`).join("")}</select></label>
-  ${ddHTML("wz_g")}<p id="wz_cnt" class="mu"></p></div>
+  <p class="mu" style="margin:0 0 6px;font-size:12px">Τα είδη ανά φάση ορίζονται στο βήμα 2 — εδώ άφησε κενό εκτός αν θέλεις να περιορίσεις ολόκληρη τη βιβλιοθήκη. Το εύρος BPM εδώ ισχύει για φάσεις χωρίς δικό τους εύρος.</p>${ddHTML("wz_g")}<p id="wz_cnt" class="mu"></p></div>
  <div class="wz-s hide" data-n="2">
   <div class="rrow"><select id="wz_tpl">${opt(Object.entries(WZT).map(([k,v])=>[k,v[0]]),"2h")}</select><button class="sm" data-a="tpl">Εφαρμογή προτύπου</button><button class="sm" data-a="addph">➕ Φάση</button><span class="mu" id="wz_tot"></span></div>
-  <div id="wz_ph"></div>
+  <p class="mu" style="font-size:12px;margin:0 0 8px">Ανά φάση: διάρκεια, ενέργεια, <b>είδος</b> (πολλά με κόμμα· ταιριάζει και μερικό όνομα, π.χ. «house»), <b>εύρος BPM</b> (κενό = γενικό) και <b>τρόπος μίξης</b>. Οι κανόνες Camelot και η καμπύλη ενέργειας ισχύουν σε όλες τις φάσεις· στις αλλαγές είδους δεν τιμωρείται το άλμα BPM.</p><datalist id="wz_gl">${[...new Set(T.flatMap(t=>t.genres||[]))].sort((a,b)=>String(a).localeCompare(b,"el")).map(g=>`<option value="${esc(g)}">`).join("")}</datalist><div id="wz_ph"></div>
   <div class="rrow" style="margin-top:10px"><span class="mu">Αφετηρία key</span><select id="wz_sk"><option value="">Αυτόματα (προτιμά 8A)</option>${CAMS.map(c=>`<option value="${c}"${sv.sk===c?" selected":""}>${padCam(c)}${KEYFEEL[c]?" — "+KEYFEEL[c]:""}</option>`).join("")}</select></div>
   <div class="rrow"><span class="mu">Ένα βήμα +1 στο key ανά</span><select id="wz_ks">${opt([["1","1 βαθμό ενέργειας"],["1.5","1,5 βαθμό (≈ 3–4 βήματα από warm-up σε peak)"],["2","2 βαθμούς"],["3","3 βαθμούς"]],sv.ks||"1.5")}</select></div>
   <div class="rrow"><span class="mu">Φάσεις «Ανέβασμα/Κατέβασμα»: ένα βήμα κάθε</span><input id="wz_ce" type="number" min="3" max="60" value="${sv.ce||12}" style="width:64px"><span class="mu">λεπτά</span></div>
@@ -2162,14 +2173,17 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
   <span><button class="sm hide" id="wz_skip" data-a="skip">⏭ Παράλειψη ανάλυσης</button> <button class="big" id="wz_go" data-a="go" style="padding:10px 22px">🧭 Δημιουργία σετ</button></span></div></div>`;
  let step=1;const $$=s=>[...m.querySelectorAll(s)];
  const showStep=n=>{step=Math.max(1,Math.min(4,n));$$(".wz-s").forEach(e=>e.classList.toggle("hide",+e.dataset.n!==step));$$(".wz-pills button").forEach(b=>b.classList.toggle("on",+b.dataset.n===step))};
- const readPh=()=>$$("#wz_ph .wz-ph").map(r=>({name:r.querySelector(".pn").value||"Φάση",min:Math.max(1,+r.querySelector(".pm").value||1),e0:Math.max(1,Math.min(10,+r.querySelector(".p0").value||1)),e1:Math.max(1,Math.min(10,+r.querySelector(".p1").value||1)),key:r.querySelector(".pk").value}));
- const drawPh=()=>{$("wz_ph").innerHTML=WZ.phases.map((p,i)=>`<div class="rrow wz-ph" data-i="${i}"><input class="pn" value="${esc(p.name)}" style="width:104px"><input class="pm" type="number" min="1" max="240" value="${p.min}" style="width:58px"><span class="mu">΄ · ενέργεια</span><input class="p0" type="number" min="1" max="10" step="0.5" value="${p.e0}" style="width:54px"><span class="mu">→</span><input class="p1" type="number" min="1" max="10" step="0.5" value="${p.e1}" style="width:54px"><select class="pk">${opt(WZK,p.key)}</select><button class="sm" data-a="phup" title="Πάνω">↑</button><button class="sm" data-a="phdn" title="Κάτω">↓</button><button class="sm" data-a="phrm" title="Διαγραφή">✕</button></div>`).join("");tot()};
+ const readPh=()=>$$("#wz_ph .wz-ph").map(r=>{const q=s=>r.querySelector(s);return{name:q(".pn").value||"Φάση",min:Math.max(1,+q(".pm").value||1),e0:Math.max(1,Math.min(10,+q(".p0").value||1)),e1:Math.max(1,Math.min(10,+q(".p1").value||1)),key:q(".pk").value,g:q(".pg").value.trim(),b1:Math.max(0,+q(".pb1").value||0),b2:Math.max(0,+q(".pb2").value||0),mx:q(".px").value}});
+ const drawPh=()=>{$("wz_ph").innerHTML=WZ.phases.map((p,i)=>`<div class="wz-ph" data-i="${i}" style="border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"><div class="rrow"><input class="pn" value="${esc(p.name)}" style="width:104px"><input class="pm" type="number" min="1" max="600" value="${p.min}" style="width:58px"><span class="mu">΄ · ενέργεια</span><input class="p0" type="number" min="1" max="10" step="0.5" value="${p.e0}" style="width:54px"><span class="mu">→</span><input class="p1" type="number" min="1" max="10" step="0.5" value="${p.e1}" style="width:54px"><select class="pk">${opt(WZK,p.key)}</select><button class="sm" data-a="phup" title="Πάνω">↑</button><button class="sm" data-a="phdn" title="Κάτω">↓</button><button class="sm" data-a="phrm" title="Διαγραφή">✕</button></div><div class="rrow"><span class="mu">🎵</span><input class="pg" list="wz_gl" value="${esc(p.g||"")}" placeholder="είδος (κόμμα για πολλά) — κενό = όλα" style="flex:1;min-width:170px"><span class="mu">BPM</span><input class="pb1" type="number" min="30" max="220" value="${p.b1||""}" placeholder="γενικό" style="width:68px"><span class="mu">–</span><input class="pb2" type="number" min="30" max="220" value="${p.b2||""}" placeholder="γενικό" style="width:68px"><select class="px">${opt(MXO,p.mx||"auto")}</select><span class="mu pc" style="font-size:12px"></span></div></div>`).join("");tot();upd()};
  const tot=()=>{const t=readPh().reduce((a,p)=>a+p.min,0);$("wz_tot").textContent=`Σύνολο: ${t}΄ (${Math.floor(t/60)}ω ${t%60}΄)`};
  const baseList=()=>{const sid=$("wz_src").value,pl=sid&&PL.find(x=>x.id===sid);let L=T.filter(t=>t.file);if(pl)L=L.filter(t=>inPL(t,pl));const g=new Set(ddVal("wz_g").map(lowS));if(g.size)L=L.filter(t=>(t.genres||[]).some(x=>g.has(lowS(x))));return L};
- const inRange=t=>{const b1=+$("wz_b1").value||0,b2=+$("wz_b2").value||999;return camP(t.cam)&&t.bpm&&t.bpm>=b1&&t.bpm<=b2};
- const upd=()=>{const b=baseList(),p=b.filter(inRange),withE=p.filter(t=>energyOf(t)!=null).length;
+ let RG=null;const rng=()=>{const g1=+$("wz_b1").value||0,g2=+$("wz_b2").value||999;let lo=1e9,hi=0;readPh().forEach(p=>{lo=Math.min(lo,p.b1||g1);hi=Math.max(hi,p.b2||g2)});return lo===1e9?[g1,g2]:[lo,hi||g2]};
+ const inRange=t=>{const[b1,b2]=RG||rng();return camP(t.cam)&&t.bpm&&t.bpm>=b1&&t.bpm<=b2};
+ const upd=()=>{RG=rng();const b=baseList(),p=b.filter(inRange),withE=p.filter(t=>energyOf(t)!=null).length;
   $("wz_cnt").textContent=T.some(t=>t.file)?`Διαθέσιμα: ${b.length} τραγούδια · με key & BPM στο εύρος: ${p.length}`:"⚠ Κανένα τραγούδι με αρχείο — πρόσθεσε ξανά τους φακέλους με τη μουσική (📚).";
-  $("wz_en").textContent=`Με γνωστή ενέργεια: ${withE} από ${p.length} (tags: ${p.filter(t=>t.esrc==="tag").length} · αυτόματα: ${p.filter(t=>t.esrc==="auto").length} · χειροκίνητα: ${p.filter(t=>t.esrc==="manual").length})`};
+  $("wz_en").textContent=`Με γνωστή ενέργεια: ${withE} από ${p.length} (tags: ${p.filter(t=>t.esrc==="tag").length} · αυτόματα: ${p.filter(t=>t.esrc==="auto").length} · χειροκίνητα: ${p.filter(t=>t.esrc==="manual").length})`;
+  const g1=+$("wz_b1").value||0,g2=+$("wz_b2").value||999;$$("#wz_ph .wz-ph").forEach(r=>{const q=s=>r.querySelector(s),gt=gTerms(q(".pg").value),lo=+q(".pb1").value||g1,hi=+q(".pb2").value||g2,mn=+q(".pm").value||0;
+   const L=b.filter(t=>camP(t.cam)&&t.bpm&&t.bpm>=lo&&t.bpm<=hi&&gMatch(t,gt)),mins=Math.round(L.reduce((a,t)=>a+(t.dur||300),0)/60),el=q(".pc");el.textContent=`${L.length} τρ. · ${mins}΄`;el.style.color=mins<mn?"var(--ac)":"";el.title=mins<mn?"Λιγότερα λεπτά μουσικής από τη διάρκεια της φάσης":"Διαθέσιμα τραγούδια με key & BPM"})};
  const cfgRead=()=>{const g=id=>$(id),sty=g("wz_sty").value,fx=fxCfg("wz");return{style:sty,b1:+g("wz_b1").value||WZS[sty].b1,b2:+g("wz_b2").value||WZS[sty].b2,jump:+g("wz_j").value||6,sk:g("wz_sk").value,ks:g("wz_ks").value,ce:+g("wz_ce").value||12,md:g("wz_md").checked,mg:+g("wz_mg").value||6,
   ak:g("wz_ak").checked,ae:g("wz_ae").checked,lim:+g("wz_lim").value||250,ma:g("wz_ma").value,ag:g("wz_ag").value,rz:+g("wz_rz").value,rc:g("wz_rc").checked,phases:readPh(),fx}};
  const save=()=>{try{const c=cfgRead();delete c.fx;localStorage.setItem("mlwiz",JSON.stringify(c))}catch(e){}};
@@ -2178,9 +2192,9 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
    r.warn.map(w=>`<p style="color:var(--ac)">⚠ ${esc(w)}</p>`).join("")+wzChart(r)+
    `<div class="mt"><button class="big" data-a="play" style="padding:9px 20px">▶ Παίξε το σετ</button><button class="sm" data-a="savepl">💾 Αποθήκευση ως playlist</button><button class="sm" data-a="again">🔀 Νέα εκδοχή</button><button class="sm" data-a="copy">📋 Αντιγραφή setlist</button></div>`+
    `<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:13px;margin:8px 0"><tr class="mu"><th align="left">Φάση</th><th align="left">Ώρα</th><th>Τρ.</th><th>Ενέργεια (στόχος)</th><th align="left">Πορεία key</th></tr>`+
-   r.phases.map(p=>`<tr><td style="padding:3px 6px 3px 0">${esc(p.name)}</td><td>${hms(p.s)}–${hms(p.e)}</td><td align="center">${p.n}</td><td align="center">${p.avgE.toFixed(1)} (${p.avgT.toFixed(1)})</td><td>${esc(p.keys.map(padCam).filter((k,i,a)=>!i||k!==a[i-1]).join(" → "))}</td></tr>`).join("")+`</table></div>`+
-   items.map((x,i)=>`<div class="mr"><span class="mu" style="min-width:46px">${hms(x.start)}</span>${i?`<span class="sgs" style="background:hsl(${Math.round(x.score*1.2)} 60% 38%)">${x.score}%</span>`:'<span class="sgs" style="background:var(--bd)">▶</span>'}<span class="ell"><b>${esc(x.t.title||x.t.fname)}</b> <span class="mu">${esc(x.t.artist||"")}</span><br><small class="mu"><span class="chip">${esc(padCam(x.t.cam))}${KEYFEEL[x.t.cam]?" · "+KEYFEEL[x.t.cam].split(" — ")[0]:""}</span><span class="chip">${i?esc(mvLabel(x.mv)):"αρχή"}</span><span class="chip">${Math.round(x.t.bpm)} BPM${x.dbpm?` (${x.dbpm>0?"+":""}${x.dbpm})`:""}</span>${x.est?'<span class="chip">ενέργεια ~εκτίμηση BPM</span>':""}</small></span><select data-ee="${i}" title="Ενέργεια (αλλάζει μόνιμα)">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option${v===Math.round(x.e)?" selected":""}>${v}</option>`).join("")}</select></div>`).join("")};
- const run=async()=>{const cfg=cfgRead();save();showStep(4);const go=$("wz_go"),sk=$("wz_skip"),stt=$("wz_status");go.disabled=true;sk.classList.remove("hide");WZ.skip=false;$("wz_res").innerHTML="";
+   r.phases.map(p=>`<tr><td style="padding:3px 6px 3px 0">${esc(p.name)}${p.g?`<br><small class="mu">${esc(p.g)}</small>`:""}</td><td>${hms(p.s)}–${hms(p.e)}</td><td align="center">${p.n}</td><td align="center">${p.avgE.toFixed(1)} (${p.avgT.toFixed(1)})</td><td>${esc(p.keys.map(padCam).filter((k,i,a)=>!i||k!==a[i-1]).join(" → "))}</td></tr>`).join("")+`</table></div>`+
+   items.map((x,i)=>`<div class="mr"><span class="mu" style="min-width:46px">${hms(x.start)}</span>${i?`<span class="sgs" style="background:hsl(${Math.round(x.score*1.2)} 60% 38%)">${x.score}%</span>`:'<span class="sgs" style="background:var(--bd)">▶</span>'}<span class="ell"><b>${esc(x.t.title||x.t.fname)}</b> <span class="mu">${esc(x.t.artist||"")}</span><br><small class="mu"><span class="chip" style="font-weight:700">${esc(r.marks[x.ph].p.name)}</span><span class="chip">${esc(padCam(x.t.cam))}${KEYFEEL[x.t.cam]?" · "+KEYFEEL[x.t.cam].split(" — ")[0]:""}</span><span class="chip">${i?esc(mvLabel(x.mv)):"αρχή"}</span><span class="chip">${Math.round(x.t.bpm)} BPM${x.dbpm?` (${x.dbpm>0?"+":""}${x.dbpm})`:""}</span>${x.est?'<span class="chip">ενέργεια ~εκτίμηση BPM</span>':""}</small></span><select data-ee="${i}" title="Ενέργεια (αλλάζει μόνιμα)">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option${v===Math.round(x.e)?" selected":""}>${v}</option>`).join("")}</select></div>`).join("")};
+ const run=async()=>{const cfg=cfgRead();save();RG=rng();showStep(4);const go=$("wz_go"),sk=$("wz_skip"),stt=$("wz_status");go.disabled=true;sk.classList.remove("hide");WZ.skip=false;$("wz_res").innerHTML="";
   try{const base=baseList();if(!base.length){stt.textContent="⚠ Κανένα τραγούδι με αρχείο στην πηγή που επέλεξες.";return}
    if(cfg.ak){const miss=shuffled(base.filter(t=>!t.cam||!t.bpm)).slice(0,cfg.lim);for(let i=0;i<miss.length&&!WZ.skip;i++){stt.textContent=`🎼 Ανάλυση key/BPM ${i+1}/${miss.length}…`;await analyzeFile(miss[i],{key:!miss[i].cam,bpm:!miss[i].bpm})}if(miss.length)render()}
    WZ.skip=false;const pool=base.filter(inRange);if(!pool.length){stt.textContent="⚠ Κανένα τραγούδι με key και BPM μέσα στο εύρος BPM. Διεύρυνε το εύρος ή άφησε ενεργή την ανάλυση key/BPM.";return}
@@ -2191,21 +2205,22 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
    if(est.size===pool.length)stt.textContent="⚠ Καμία γνωστή ενέργεια — χρησιμοποιώ εκτίμηση από το BPM. Άφησε ενεργή την «Ανάλυση ενέργειας» για καλύτερο αποτέλεσμα.";else stt.textContent="";
    const r=planSet(pool,{phases:cfg.phases,energy:en,est,b1:cfg.b1,b2:cfg.b2,jump:cfg.jump,startKey:cfg.sk,keyStep:+cfg.ks,climbEvery:cfg.ce,mood:cfg.md,moodGap:cfg.mg,maxA:+cfg.ma,gap:+cfg.ag,rz:cfg.rz,recent:cfg.rc});
    if(!r||!r.mix.length){stt.textContent="⚠ Δεν βρέθηκε σετ με αυτές τις ρυθμίσεις.";return}
-   const fc=cfg.fx;if(fc.trimS||fc.trimE||fc.smart)await djPts(r.mix,fc,msg=>{stt.textContent=msg},()=>WZ.skip);
+   const fc=cfg.fx;WZ.per=new Map();r.items.forEach(x=>{const ph=cfg.phases[x.ph],mx=ph&&MXS[ph.mx];if(mx)WZ.per.set(x.t,mx)});const anySm=[...WZ.per.values()].some(v=>v.smart);
+   if(fc.trimS||fc.trimE||fc.smart||anySm)await djPts(r.mix,{...fc,smart:fc.smart||anySm},msg=>{stt.textContent=msg},()=>WZ.skip);
    WZ.last=r;mkRes(r)}
   catch(e){console.error(e);stt.textContent="⚠ Σφάλμα: "+(e&&e.message||e)}
   finally{go.disabled=false;sk.classList.add("hide")}};
- const setList=r=>r.items.map((x,i)=>`${String(i+1).padStart(2,"0")}  ${hms(x.start)}  ${x.t.artist?x.t.artist+" – ":""}${x.t.title||x.t.fname}  [${padCam(x.t.cam)} · ${Math.round(x.t.bpm)} BPM · E${Math.round(x.e)}${i?" · "+mvLabel(x.mv):""}]`).join("\n");
+ const setList=r=>r.items.map((x,i)=>`${String(i+1).padStart(2,"0")}  ${hms(x.start)}  ${x.t.artist?x.t.artist+" – ":""}${x.t.title||x.t.fname}  [${r.marks[x.ph].p.name} · ${padCam(x.t.cam)} · ${Math.round(x.t.bpm)} BPM · E${Math.round(x.e)}${i?" · "+mvLabel(x.mv):""}]`).join("\n");
  m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a,row=b.closest(".wz-ph"),i=row?+row.dataset.i:-1;
   if(a==="step")showStep(+b.dataset.n);else if(a==="next")showStep(step+1);else if(a==="back")showStep(step-1);else if(a==="skip")WZ.skip=true;else if(a==="go"||a==="again")run();
   else if(a==="tpl"){WZ.phases=tplPh($("wz_tpl").value);drawPh();save()}
   else if(a==="addph"){WZ.phases=readPh();WZ.phases.push({name:"Φάση "+(WZ.phases.length+1),min:15,e0:5,e1:7,key:"auto"});drawPh()}
   else if(a==="phrm"){WZ.phases=readPh();if(WZ.phases.length>1)WZ.phases.splice(i,1);drawPh();save()}
   else if(a==="phup"||a==="phdn"){WZ.phases=readPh();const j=a==="phup"?i-1:i+1;if(j>=0&&j<WZ.phases.length){[WZ.phases[i],WZ.phases[j]]=[WZ.phases[j],WZ.phases[i]];drawPh();save()}}
-  else if(a==="play"&&WZ.last){const fc=fxCfg("wz");m.classList.add("hide");shuf=false;$("pshuf").classList.remove("on");pendingAMX=fxAny(fc)?fc:null;startQ(WZ.last.mix,WZ.last.mix[0],0);if(S.queue!=="never")openQ(true);toast(`Σετ: ${WZ.last.mix.length} τραγούδια · ${hms(WZ.last.tot)}`)}
+  else if(a==="play"&&WZ.last){const fc=fxCfg("wz");m.classList.add("hide");shuf=false;$("pshuf").classList.remove("on");const pr=WZ.per&&WZ.per.size?WZ.per:null;pendingAMX=fxAny(fc)||pr?{...fc,per:pr,anySm:!!pr&&[...pr.values()].some(v=>v.smart)}:null;startQ(WZ.last.mix,WZ.last.mix[0],0);if(S.queue!=="never")openQ(true);toast(`Σετ: ${WZ.last.mix.length} τραγούδια · ${hms(WZ.last.tot)}`)}
   else if(a==="savepl"&&WZ.last){const p=newPL("Set "+dstr());addToPL(WZ.last.mix,p);toast("Αποθηκεύτηκε η playlist: "+p.name)}
   else if(a==="copy"&&WZ.last){const txt=setList(WZ.last);try{await navigator.clipboard.writeText(txt);toast("Το setlist αντιγράφηκε")}catch(x){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");toast("Το setlist αντιγράφηκε")}catch(y){toast("Δεν ήταν δυνατή η αντιγραφή")}ta.remove()}}};
- m.oninput=e=>{if(e.target.closest("#wz_ph"))tot()};
+ m.oninput=e=>{if(e.target.closest("#wz_ph")){tot();clearTimeout(m._u);m._u=setTimeout(upd,250)}};
  m.onchange=e=>{const t=e.target;
   if(t.id==="wz_sty"){const s=WZS[t.value];$("wz_note").textContent=s.note;if(t.value!=="custom"){$("wz_b1").value=s.b1;$("wz_b2").value=s.b2}$("wz_j").value=s.j}
   if(t.dataset&&t.dataset.ee!==undefined&&WZ.last){const x=WZ.last.items[+t.dataset.ee];x.t.energy=+t.value;x.t.esrc="manual";idbDirty=true;toast("Αποθηκεύτηκε η ενέργεια — πάτα «Νέα εκδοχή» για να εφαρμοστεί")}
