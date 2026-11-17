@@ -4,7 +4,7 @@
 <title>Dj Ape1</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("mltheme")||"dark";document.documentElement.dataset.skin=localStorage.getItem("mlskin")||""}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Righteous&family=Space+Grotesk:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+<script>if(!window.desktop)document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"><\/script>')</script>
 <style>
 :root{--bg:#f5f4f0;--card:#fff;--tx:#1c1c1a;--mu:#74736d;--bd:#e4e2dc;--ac:#c2410c;--ac2:#fde7d9;--web:#1d4ed8;--web2:#dde8ff}
 @media(prefers-color-scheme:dark){:root{--bg:#141413;--card:#1e1e1c;--tx:#efeee9;--mu:#9b9a93;--bd:#33322f;--ac:#fb923c;--ac2:#3b2413;--web:#85a9ff;--web2:#1b2848}}
@@ -247,6 +247,8 @@ body.compact .trow{min-height:34px}body.compact .tc{padding:3px 10px}body.compac
   <div class="eqb" id="eqb"></div>
    <div class="btns"><button class="big hide" id="resume"></button></div>
   <div class="btns"><button class="big" id="pick">📁 Φάκελοι</button><button class="big alt" id="pickf">🎵 Αρχεία</button><button class="big alt" id="pickp">▶ Player</button></div>
+  <div class="btns"><button class="sm" id="wplayd">▶ Παίξε φάκελο</button><button class="sm" id="wplayf">▶ Παίξε αρχεία</button></div>
+  <input type="file" id="fpd" webkitdirectory multiple class="hide"><input type="file" id="fpf" multiple accept="audio/*,.flac,.m4a,.ogg,.opus,.wma,.aiff,.aif,.ape,.wv" class="hide">
   <input type="file" id="fi" webkitdirectory multiple class="hide"><input type="file" id="fa" webkitdirectory multiple class="hide"><input type="file" id="fq" webkitdirectory multiple class="hide">
   <input type="file" id="ff" multiple accept="audio/*,.flac,.m4a,.ogg,.opus,.wma,.aiff,.aif,.ape,.wv" class="hide"><input type="file" id="fj" accept=".json,application/json" class="hide">
   <div class="btns"><button class="sm openlib">📂 Βιβλιοθήκη</button><button class="sm hide" id="welcomeLink"></button><label class="opt" style="margin:0"><input type="checkbox" id="useweb" checked> Συμπλήρωση από web</label></div>
@@ -259,7 +261,7 @@ body.compact .trow{min-height:34px}body.compact .tc{padding:3px 10px}body.compac
  <aside>
   <div class="brand"><span class="vin"></span><span>Dj Ape1</span>
    <div class="pm"><button class="ib pmb" data-pm="m_add" title="Προσθήκη μουσικής">＋</button>
-    <div class="pop r" id="m_add"><button id="add">📁 Φάκελοι…</button><button id="addf">🎵 Αρχεία…</button><button class="openlib">📂 Άνοιγμα βιβλιοθήκης</button><button id="chknew">🔄 Έλεγχος για νέα τραγούδια</button><button id="keeptemp">💾 Κράτηση τραγουδιών του player στη βιβλιοθήκη</button></div></div></div>
+    <div class="pop r" id="m_add"><button id="add">📁 Φάκελοι…</button><button id="addf">🎵 Αρχεία…</button><button id="playd">▶ Παίξε φάκελο (χωρίς βιβλιοθήκη)</button><button id="playf">▶ Παίξε αρχεία (χωρίς βιβλιοθήκη)</button><button class="openlib">📂 Άνοιγμα βιβλιοθήκης</button><button id="chknew">🔄 Έλεγχος για νέα τραγούδια</button><button id="keeptemp">💾 Κράτηση τραγουδιών του player στη βιβλιοθήκη</button></div></div></div>
   <div id="gbox"><h2>Είδη · Crates</h2><div id="glist"></div></div>
   <div id="plbox"><h2><span>Playlists</span><span class="pm"><button class="ib" id="plsmart2" title="Έξυπνη playlist (κανόνες)">✨</button><button class="ib pmb" data-pm="m_pl" title="Νέα playlist">＋</button>
    <div class="pop r" id="m_pl"><button id="plnew">➕ Νέα playlist</button><button id="plsmart">✨ Έξυπνη playlist</button></div></span></h2><div id="pllist"></div></div>
@@ -611,7 +613,7 @@ $("content").addEventListener("scroll",()=>{if(wsRaf)return;wsRaf=requestAnimati
 window.addEventListener("resize",()=>renderWin(true));
 $("content").addEventListener("click",e=>{
  const p=e.target.closest("[data-p]");if(p){startQ(lastL,T[p.dataset.p]);return}
- const inf=e.target.closest("[data-info]");if(inf){open(T[inf.dataset.info]);return}
+ const inf=e.target.closest("[data-info]");if(inf){openInfo(T[inf.dataset.info]);return}
  const row=e.target.closest("[data-i]");if(!row)return;const t=T[row.dataset.i];
  if(selMode){sel.has(t)?sel.delete(t):sel.add(t);if(view==="l"){renderWin(true);$("bn").textContent=sel.size}else render()}
  else{focusI=+row.dataset.i;document.querySelectorAll(".focus").forEach(x=>x.classList.remove("focus"));row.classList.add("focus")}});
@@ -628,7 +630,7 @@ function thumbCached(p){if(p&&p.thumb)return Promise.resolve(p.thumb);const d=p.
 const PLS=new WeakMap();
 function plSet(p){let c=PLS.get(p);if(!c||c.n!==p.items.length||c.a!==p.items){c={n:p.items.length,a:p.items,s:new Set(p.items)};PLS.set(p,c)}return c.s}
 
-function open(t){
+function openInfo(t){
  const w=k=>t.webFilled.includes(k)?' <span class="wm">🌐 web</span>':"";
  const rows=[["Καλλιτέχνης",esc(t.artist||"—")+w("artist")],["Άλμπουμ",esc(t.album||"—")+w("album")],["Έτος",esc(t.year||"—")+w("year")],["Κομμάτι",esc(t.track||"—")],["BPM",t.bpm?t.bpm.toFixed(1)+(t.bpmsrc==="tag"?" (από tag)":" (ανίχνευση)"):"—"],["Διάρκεια",mmss(t.dur)],["Key",t.cam?`${t.cam} · ${esc(t.key)} (${t.keysrc==="tag"?"από tag":"ανίχνευση"})`:"—"],["Μορφή",esc(t.format)],["Μέγεθος",t.size+" MB"],["Σχόλιο",esc(t.comment||"—")],["Φάκελος",esc(t.folder||".")],["Αρχείο",esc(t.fname||"")]];
  const m=$("modal");m.classList.remove("hide");
@@ -636,7 +638,7 @@ function open(t){
  <div class="gbig"><small>ΕΙΔΟΣ ΜΟΥΣΙΚΗΣ · ${t.gsrc==="tag"?"από τα tags του αρχείου":t.gsrc==="manual"?"✏️ ορίστηκε από εσένα":t.gsrc.startsWith("web")?"🌐 βρέθηκε στο web ("+esc(t.gsrc.slice(4))+")":"δεν βρέθηκε"}</small><div class="tags">${gtag(t)}</div></div>
  <dl>${rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("")}</dl><div class="mt" style="margin:16px 0 0"><button class="sm" id="mplay">▶ Αναπαραγωγή</button><button class="sm" id="mkey">🎼 Εύρεση key & BPM</button><button class="sm" id="mpl">🎶 Στη playlist</button><button class="sm" id="medit">✏️ Επεξεργασία</button><button class="sm danger" id="mrem">🗑 Αφαίρεση από τη βιβλιοθήκη</button></div></div>`;
  m.onclick=e=>{if(e.target===m||e.target.className==="x")m.classList.add("hide")};
- $("mkey").onclick=async()=>{if(!t.file){toast("Χρειάζεται το αρχείο — πρόσθεσε ξανά τον φάκελο");return}toast("Ανάλυση…");const k=await analyzeFile(t,{key:!t.cam||t.keysrc==="detected",bpm:!t.bpm||t.bpmsrc==="detected"});if(k&&(k.key||k.bpm)){render();open(t)}else toast("Δεν ήταν δυνατή η ανίχνευση")};$("mplay").onclick=()=>{m.classList.add("hide");startQ(lastL.includes(t)?lastL:[t],t)};$("mpl").onclick=()=>pickPL([t]);$("medit").onclick=()=>editTrack(t);$("mrem").onclick=()=>{if(confirm("Να αφαιρεθεί το τραγούδι από τη βιβλιοθήκη;")){removeTracks([t]);m.classList.add("hide")}};
+ $("mkey").onclick=async()=>{if(!t.file){toast("Χρειάζεται το αρχείο — πρόσθεσε ξανά τον φάκελο");return}toast("Ανάλυση…");const k=await analyzeFile(t,{key:!t.cam||t.keysrc==="detected",bpm:!t.bpm||t.bpmsrc==="detected"});if(k&&(k.key||k.bpm)){render();openInfo(t)}else toast("Δεν ήταν δυνατή η ανίχνευση")};$("mplay").onclick=()=>{m.classList.add("hide");startQ(lastL.includes(t)?lastL:[t],t)};$("mpl").onclick=()=>pickPL([t]);$("medit").onclick=()=>editTrack(t);$("mrem").onclick=()=>{if(confirm("Να αφαιρεθεί το τραγούδι από τη βιβλιοθήκη;")){removeTracks([t]);m.classList.add("hide")}};
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape")$("modal").classList.add("hide")});
 function setProg(txt,pct){$("ptxt").textContent=txt;$("pbar").style.width=pct+"%";if($("welcome").classList.contains("hide"))$("webst").textContent=txt}
@@ -718,14 +720,14 @@ $("bset").onclick=()=>{if(needSel())return;const v=prompt("Νέο είδος γ�
 $("badd").onclick=()=>{if(needSel())return;const v=prompt("Είδος προς προσθήκη στα επιλεγμένα:");if(!v)return;applyGenres([...sel],cleanGenre(v),"add")};
 $("bdel").onclick=()=>{if(needSel())return;if(confirm(`Να αφαιρεθούν ${sel.size} τραγούδια από τη βιβλιοθήκη; (Τα αρχεία στον δίσκο δεν διαγράφονται.)`))removeTracks([...sel])};
 
-function editTrack(t){const m=$("modal");
+function editTrack(t){const m=$("modal");m.classList.remove("hide");
  const f=(id,l,v)=>`<label class="fld"><span class="mu">${l}</span><input id="${id}" value="${esc(v)}"></label>`;
  m.innerHTML=`<div class="mc"><div class="mh"><h2>✏️ Επεξεργασία</h2><button class="x">×</button></div>`+f("e_t","Τίτλος",t.title)+f("e_a","Καλλιτέχνης",t.artist)+f("e_al","Άλμπουμ",t.album)+f("e_y","Έτος",t.year)+f("e_g","Είδος (πολλά, χωρισμένα με κόμμα)",t.genres.join(", "))+`<div class="mt"><button class="big" id="e_ok" style="padding:10px 22px;font-size:15px">Αποθήκευση</button><button class="sm" id="e_c">Άκυρο</button></div></div>`;
- $("e_c").onclick=()=>open(t);
+ $("e_c").onclick=()=>openInfo(t);
  $("e_ok").onclick=()=>{const y=$("e_y").value.trim();if(y&&!/^\d{4}$/.test(y)){toast("Το έτος πρέπει να έχει 4 ψηφία (π.χ. 1998)");return}
   t.title=$("e_t").value.trim()||t.title;t.artist=$("e_a").value.trim();t.album=$("e_al").value.trim();t.year=y;
   const g=cleanGenre($("e_g").value);if(g.join("|")!==t.genres.join("|")){t.genres=g;t.gsrc=g.length?"manual":"none"}
-  t.webFilled=[];t.miss=[];markDirty();render();if(t===cur){$("ptitle").textContent=t.title;$("partist").textContent=[t.artist,t.album,t.cam&&"🎼 "+t.cam+" "+t.key,t.bpm&&Math.round(t.bpm)+" BPM"].filter(Boolean).join(" · ");fsUpdate()}open(t)}}
+  t.webFilled=[];t.miss=[];markDirty();render();if(t===cur){$("ptitle").textContent=t.title;$("partist").textContent=[t.artist,t.album,t.cam&&"🎼 "+t.cam+" "+t.key,t.bpm&&Math.round(t.bpm)+" BPM"].filter(Boolean).join(" · ");fsUpdate()}openInfo(t)}}
 
 const dkey=t=>(t.artist+"|"+t.title).toLowerCase().replace(/[^\p{L}\p{N}]+/gu,"");
 function rootsOf(){const m={};T.forEach(t=>{const pr=t.path.split("/").filter(Boolean);const r=pr.length>1?pr[0]:"(αρχεία χωρίς φάκελο)";(m[r]=m[r]||[]).push(t)});return m}
@@ -1009,7 +1011,7 @@ $("colbtn").onclick=()=>{const m=$("modal");m.classList.remove("hide");
 $("keyall").onclick=()=>analyzeKeys(lastL);$("keystop").onclick=()=>{keyStop=true};
 $("bkey").onclick=()=>{if(!sel.size){toast("Δεν έχεις επιλέξει τραγούδια");return}analyzeKeys([...sel])};
 $("padd").onclick=()=>cur?pickPL([cur]):toast("Δεν παίζει κάποιο τραγούδι");
-$("pinfo").onclick=()=>{if(cur)open(cur)};
+$("pinfo").onclick=()=>{if(cur)openInfo(cur)};
 
 /* playlists: delete + genre dropdown */
 function delPL(id){const p=PL.find(x=>x.id===id);if(!p||!confirm(`Να διαγραφεί η playlist «${p.name}»; (Τα τραγούδια δεν διαγράφονται.)`))return;PL=PL.filter(x=>x!==p);if(selPL===id)selPL=null;markDirty();render();toast("Η playlist διαγράφηκε")}
@@ -1171,7 +1173,7 @@ const EXACT={
 "Χρώμα του key":"Key color","Ένα χρώμα":"Single color","Πλήθος μπάρων":"Number of bars","Ευαισθησία":"Sensitivity","Ομαλότητα":"Smoothness",
 "Φωτεινότητα φόντου (πλήρης οθόνη)":"Background brightness (fullscreen)","Κορυφές (peaks)":"Peak caps","Λάμψη (glow)":"Glow","Ποιότητα":"Quality",
 "Οικονομική (30 fps)":"Economy (30 fps)","Υψηλή (60 fps)":"High (60 fps)",
-"Προσθήκη μουσικής":"Add music","📁 Φάκελοι…":"📁 Folders…","🎵 Αρχεία…":"🎵 Files…","📂 Άνοιγμα βιβλιοθήκης":"📂 Open library","➕ Νέα playlist":"➕ New playlist",
+"📂 Εμφάνιση φακέλου":"📂 Show folder","▶ Παίξε φάκελο (χωρίς βιβλιοθήκη)":"▶ Play folder (no library)","▶ Παίξε αρχεία (χωρίς βιβλιοθήκη)":"▶ Play files (no library)","▶ Παίξε φάκελο":"▶ Play folder","▶ Παίξε αρχεία":"▶ Play files","▶ Παίξε μόνο, χωρίς βιβλιοθήκη":"▶ Play only, no library","Προσθήκη μουσικής":"Add music","📁 Φάκελοι…":"📁 Folders…","🎵 Αρχεία…":"🎵 Files…","📂 Άνοιγμα βιβλιοθήκης":"📂 Open library","➕ Νέα playlist":"➕ New playlist",
 "Πλαϊνό μενού":"Sidebar","Αναζήτηση…":"Search…","▶ Αναπαραγωγή ▾":"▶ Play ▾","▶ Αναπαραγωγή όλων":"▶ Play all","🔀 Τυχαία με φίλτρα…":"🔀 Shuffle with filters…",
 "👁 Προβολή ▾":"👁 View ▾","☰ Πίνακας":"☰ Table","▦ Κάρτες":"▦ Cards","Ταξινόμηση":"Sort","⚙ Παραμετροποίηση οθόνης…":"⚙ Customize display…","🙈 Απόκρυψη μενού":"🙈 Hide menus",
 "Περισσότερα":"More","☑ Επιλογή τραγουδιών":"☑ Select tracks","Εμφάνιση μενού":"Show menus","🎶 Προσθήκη στη playlist":"🎶 Add to playlist","ⓘ Πληροφορίες / επεξεργασία":"ⓘ Info / edit",
@@ -1239,21 +1241,21 @@ const EXACT={
 "Fade out / fade in μεταξύ τραγουδιών (δευτ.)":"Fade out / fade in between tracks (sec)","Ανάλυση key για όσα δεν έχουν":"Analyze key for tracks without one",
 "▶ Δημιουργία & έναρξη":"▶ Create & start","💾 Αποθήκευση ως playlist":"💾 Save as playlist",
 "🔀 Τυχαία αναπαραγωγή":"🔀 Shuffle play","Πλήθος τραγουδιών":"Number of tracks","▶ Έναρξη":"▶ Start",
-"Η ουρά είναι κενή.":"The queue is empty.","🙈 Απόκρυψη":"🙈 Hide","🧭 Wizard σετ":"🧭 Set wizard","🧭 Wizard σχεδιασμού σετ":"🧭 Set design wizard","🧭 Δημιουργία σετ":"🧭 Create set","▶ Παίξε το σετ":"▶ Play the set","📋 Αντιγραφή setlist":"📋 Copy setlist","Επόμενο ▶":"Next ▶","◀ Πίσω":"◀ Back","➕ Φάση":"➕ Phase","🔮 Επόμενο τραγούδι":"🔮 Next track","Εφαρμογή μεταβάσεων στην ουρά που παίζει":"Apply transitions to the playing queue","⏭ Παράλειψη ανάλυσης":"⏭ Skip analysis","🎚 Μεταβάσεις (fade / σιωπή / έξυπνα σημεία)":"🎚 Transitions (fade / silence / smart points)","Fade out (δευτ.)":"Fade out (sec)","Fade in (δευτ.)":"Fade in (sec)","Όριο σιωπής":"Silence threshold","Εμφάνιση / απόκρυψη λίστας (L)":"Show / hide list (L)","Απόκρυψη λίστας":"Hide list","⚙ Περισσότερες επιλογές":"⚙ More options","👁 Προεπισκόπηση":"👁 Preview","▶ Παίξε αυτό το mix":"▶ Play this mix",
-"Αρχείο διαγνωστικών (σφάλματα / καθυστερήσεις)":"Diagnostics file (errors / slowdowns)","Εμφάνιση":"Show","Η εφαρμογή ανέκαμψε από σφάλμα — η βιβλιοθήκη ανακτήθηκε":"The app recovered from an error — the library was restored",
+"Η ουρά είναι κενή.":"The queue is empty.","🙈 Απόκρυψη":"🙈 Hide","🧭 Wizard σετ":"🧭 Set wizard","🧭 Wizard σχεδιασμού σετ":"🧭 Set design wizard","🧭 Δημιουργία σετ":"🧭 Create set","▶ Παίξε το σετ":"▶ Play the set","📋 Αντιγραφή setlist":"📋 Copy setlist","Επόμενο ▶":"Next ▶","◀ Πίσω":"◀ Back","➕ Φάση":"➕ Phase","🔮 Επόμενο τραγούδι":"🔮 Next track","Εφαρμογή μεταβάσεων στην ουρά που παίζει":"Apply transitions to the playing queue","🎚 Μεταβάσεις (fade / σιωπή / έξυπνα σημεία)":"🎚 Transitions (fade / silence / smart points)","Fade out (δευτ.)":"Fade out (sec)","Fade in (δευτ.)":"Fade in (sec)","Όριο σιωπής":"Silence threshold","Εμφάνιση / απόκρυψη λίστας (L)":"Show / hide list (L)","Απόκρυψη λίστας":"Hide list","⚙ Περισσότερες επιλογές":"⚙ More options","👁 Προεπισκόπηση":"👁 Preview","▶ Παίξε αυτό το mix":"▶ Play this mix",
+"Αρχείο διαγνωστικών (σφάλματα / καθυστερήσεις)":"Diagnostics file (errors / slowdowns)","Η εφαρμογή ανέκαμψε από σφάλμα — η βιβλιοθήκη ανακτήθηκε":"The app recovered from an error — the library was restored",
 "Άνοιγμα":"Open",
 "Επιλογή ειδών":"Choose genres","🧠 Smart Mix από αυτή τη λίστα":"🧠 Smart Mix from this list","🧠 Mix":"🧠 Mix","🎼 Ανάλυση":"🎼 Analyze","Φτιάχνει μια ροή τραγουδιών όπως το Automix, αλλά επιλέγει κάθε επόμενο τραγούδι με βάση αρμονία key, BPM, ενέργεια, είδος, ποικιλία καλλιτεχνών και τι άκουσες πρόσφατα.":"Builds a track flow like Automix, but picks each next track by key harmony, BPM, energy, genre, artist variety and what you played recently.","Πηγή":"Source","✨ Οι κανόνες που ετοίμασες":"✨ The rules you set up","Ροή ενέργειας (BPM)":"Energy flow (BPM)","Σταθερή":"Steady","Ανοδική (χαμηλό → υψηλό)":"Rising (low → high)","Καθοδική (υψηλό → χαμηλό)":"Falling (high → low)","Κύμα (ανεβαίνει και κατεβαίνει)":"Wave (rises and falls)","Αρμονία key":"Key harmony","Αυστηρή (μόνο συμβατά key)":"Strict (compatible keys only)","Ελεύθερη":"Free","Αρχή από":"Start from","Αυτόματα (καλύτερο ξεκίνημα)":"Automatic (best start)","Τρέχον / επιλεγμένο τραγούδι":"Current / selected track","Crossfade (δευτ.)":"Crossfade (sec)","Ανάλυση key / BPM για όσα δεν έχουν (έως 60 τραγούδια)":"Analyze key / BPM for tracks without it (up to 60)","🔀 Δημιουργία":"🔀 Create","▶ Παίξε":"▶ Play","🔀 Νέα εκδοχή":"🔀 New version","⚠ Κανένα τραγούδι με αρχείο — επανασύνδεσε τους φακέλους (📚)":"⚠ No track with a file — reconnect your folders (📚)","ίδιο αρχείο":"same file","ίδιο τραγούδι":"same song","ίδιος τίτλος και διάρκεια":"same title and length","Η συγχώνευση κρατά το καλύτερο αντίγραφο, περνά σε αυτό τα στοιχεία, τις ακροάσεις και τις playlists, και αφαιρεί τα υπόλοιπα από τη βιβλιοθήκη. Τα αρχεία στον δίσκο δεν διαγράφονται.":"Merging keeps the best copy, passes the details, plays and playlists to it, and removes the rest from the library. Files on disk are not deleted.","🧹 Συγχώνευση όλων αυτόματα":"🧹 Merge all automatically","Συγχώνευση":"Merge","(χωρίς αρχείο)":"(no file)","✅ Δεν βρέθηκαν διπλότυπα.":"✅ No duplicates found.","📚 Βιβλιοθήκη":"📚 Library","Με συνδεδεμένο αρχείο":"With a linked file","Χωρίς αρχείο (χρειάζονται επανασύνδεση)":"Without a file (need reconnecting)","Περιττά αντίγραφα":"Redundant copies","🧹 Καθαρισμός":"🧹 Clean up","↩ Άνοιγμα":"↩ Open","Φάκελοι":"Folders","✓ συνδεδεμένος":"✓ connected","⚠ χρειάζεται άδεια":"⚠ needs permission","Δεν υπάρχουν φάκελοι.":"No folders.","⟳ Συγχρονισμός φακέλων":"⟳ Sync folders","➕ Προσθήκη φακέλου…":"➕ Add folder…","Ο συγχρονισμός επανασυνδέει αρχεία που λείπουν, προσθέτει μόνο τα νέα και συγχωνεύει αντίγραφα. Δεν δημιουργεί διπλότυπα.":"Sync reconnects missing files, adds only the new ones and merges copies. It never creates duplicates.","📂 Εισαγωγή αρχείου βιβλιοθήκης…":"📂 Import library file…","💾 Εξαγωγή":"💾 Export","🆕 Νέα βιβλιοθήκη":"🆕 New library","Να ξεκινήσει νέα βιβλιοθήκη; Η τρέχουσα θα αποθηκευτεί ως αντίγραφο ασφαλείας.":"Start a new library? The current one will be kept as a backup.","Ο συγχρονισμός ολοκληρώθηκε":"Sync finished","Να αφαιρεθεί ο φάκελος από τη λίστα; (Τα αρχεία δεν διαγράφονται.)":"Remove the folder from the list? (Files are not deleted.)","Βιβλιοθήκη και φάκελοι":"Library and folders","Smart Mix — έξυπνη ροή τραγουδιών":"Smart Mix — smart track flow","➕ Προσθήκη στη βιβλιοθήκη μου":"➕ Add to my library","🆕 Νέα βιβλιοθήκη (η παλιά κρατιέται ως αντίγραφο)":"🆕 New library (the old one is kept as a backup)","📂 Αρχείο βιβλιοθήκης":"📂 Library file","♻ Αντικατάσταση (κρατιέται αντίγραφο της τρέχουσας)":"♻ Replace (a backup of the current one is kept)",
 
 "Έξυπνη playlist (κανόνες)":"Smart playlist (rules)","Playlists και έξυπνες playlists":"Playlists and smart playlists","✨ Νέα έξυπνη playlist":"✨ New smart playlist","Δεν υπάρχουν playlists ακόμα.":"No playlists yet.",
 "Ξεχωριστό παράθυρο":"Separate window","Το πρόγραμμα περιήγησης μπλόκαρε το αναδυόμενο παράθυρο — το μικρό παράθυρο εμφανίστηκε μέσα στη σελίδα":"The browser blocked the pop-up — the mini player is shown inside the page",
 "Το μίνι player εμφανίστηκε μέσα στη σελίδα· το ⇱ το ανοίγει σε ξεχωριστό παράθυρο":"The mini player is shown inside the page; ⇱ opens it in a separate window","Το πρόγραμμα περιήγησης μπλόκαρε το αναδυόμενο παράθυρο — επίτρεψέ το για αυτή τη σελίδα":"The browser blocked the pop-up — allow it for this page",
-"🎨 Θέμα":"🎨 Theme","Σκούρο (προεπιλογή)":"Dark (default)","Φωτεινό":"Light","Είδος":"Genre","Τίτλος":"Title","Key (Camelot)":"Key (Camelot)","Διάρκεια (λεπτά)":"Duration (minutes)","Φορές αναπαραγωγής":"Play count","Τελευταία αναπαραγωγή":"Last played","Αρχείο":"File","είναι":"is","δεν είναι":"is not","περιέχει":"contains","είναι ακριβώς":"is exactly","δεν περιέχει":"does not contain","μεταξύ":"between","ταιριάζει αρμονικά με":"harmonically matches","έχει key":"has a key","δεν έχει key":"has no key","τουλάχιστον":"at least","το πολύ":"at most","ακριβώς":"exactly","πριν από (ημέρες) ή ποτέ":"more than (days) ago, or never","μέσα στις τελευταίες (ημέρες)":"within the last (days)","ποτέ":"never","είναι συνδεδεμένο":"is linked","λείπει":"is missing","από":"from","έως":"to","τιμή":"value","αριθμός":"number","π.χ. 8A":"e.g. 8A","Η playlist γεμίζει αυτόματα με τα τραγούδια που ταιριάζουν στους κανόνες.":"The playlist fills automatically with the tracks that match the rules.","π.χ. House 120-126, αρμονικά":"e.g. House 120-126, harmonic","Ταίριασμα":"Match","όλων των κανόνων":"all rules","οποιουδήποτε κανόνα":"any rule","➕ Κανόνας":"➕ Rule","⚙ Κανόνες":"⚙ Rules","🔮 Επόμενο τραγούδι":"🔮 Next track","Μετά από:":"After:","Δεν βρέθηκαν προτάσεις.":"No suggestions found.","🎼 Ανάλυση":"🎼 Analyze","είδος":"genre","Αυτόματη συνέχεια (Auto DJ): όταν τελειώσει η ουρά, παίζει την καλύτερη πρόταση":"Auto-continue (Auto DJ): when the queue ends, plays the best suggestion","Μικρό παράθυρο (Ctrl+Shift+M)":"Mini player (Ctrl+Shift+M)","Πρόταση επόμενου τραγουδιού":"Next-track suggestion","Το πρόγραμμα περιήγησης μπλόκαρε το μικρό παράθυρο":"The browser blocked the mini window","Δώσε όνομα":"Enter a name",
+"🎨 Θέμα":"🎨 Theme","Σκούρο (προεπιλογή)":"Dark (default)","Φωτεινό":"Light","Key (Camelot)":"Key (Camelot)","Διάρκεια (λεπτά)":"Duration (minutes)","Φορές αναπαραγωγής":"Play count","Τελευταία αναπαραγωγή":"Last played","είναι":"is","δεν είναι":"is not","περιέχει":"contains","είναι ακριβώς":"is exactly","δεν περιέχει":"does not contain","μεταξύ":"between","ταιριάζει αρμονικά με":"harmonically matches","έχει key":"has a key","δεν έχει key":"has no key","τουλάχιστον":"at least","το πολύ":"at most","ακριβώς":"exactly","πριν από (ημέρες) ή ποτέ":"more than (days) ago, or never","μέσα στις τελευταίες (ημέρες)":"within the last (days)","ποτέ":"never","είναι συνδεδεμένο":"is linked","λείπει":"is missing","από":"from","έως":"to","τιμή":"value","αριθμός":"number","π.χ. 8A":"e.g. 8A","Η playlist γεμίζει αυτόματα με τα τραγούδια που ταιριάζουν στους κανόνες.":"The playlist fills automatically with the tracks that match the rules.","π.χ. House 120-126, αρμονικά":"e.g. House 120-126, harmonic","Ταίριασμα":"Match","όλων των κανόνων":"all rules","οποιουδήποτε κανόνα":"any rule","➕ Κανόνας":"➕ Rule","⚙ Κανόνες":"⚙ Rules","Μετά από:":"After:","Δεν βρέθηκαν προτάσεις.":"No suggestions found.","είδος":"genre","Αυτόματη συνέχεια (Auto DJ): όταν τελειώσει η ουρά, παίζει την καλύτερη πρόταση":"Auto-continue (Auto DJ): when the queue ends, plays the best suggestion","Μικρό παράθυρο (Ctrl+Shift+M)":"Mini player (Ctrl+Shift+M)","Πρόταση επόμενου τραγουδιού":"Next-track suggestion","Το πρόγραμμα περιήγησης μπλόκαρε το μικρό παράθυρο":"The browser blocked the mini window",
 
 "Ο ήχος πηγαίνει από το αρχείο στην έξοδο χωρίς αλλαγή έντασης, crossfade, ανάλυση ή οπτικοποίηση κατά την αναπαραγωγή.":"Audio goes from the file to the output with no volume change, crossfade, analysis or visualizer during playback.",
-"Κλείσιμο στο tray (η μουσική συνεχίζει)":"Close to tray (music keeps playing)","Έναρξη με τα Windows":"Start with Windows","Αντίγραφα ασφαλείας βιβλιοθήκης":"Library backups","Φάκελος":"Folder","Επαναφορά…":"Restore…","Αντίγραφα ασφαλείας":"Backups","Δεν υπάρχουν αντίγραφα ακόμα.":"No backups yet.","Επαναφορά":"Restore",
+"Κλείσιμο στο tray (η μουσική συνεχίζει)":"Close to tray (music keeps playing)","Έναρξη με τα Windows":"Start with Windows","Αντίγραφα ασφαλείας βιβλιοθήκης":"Library backups","Επαναφορά…":"Restore…","Αντίγραφα ασφαλείας":"Backups","Δεν υπάρχουν αντίγραφα ακόμα.":"No backups yet.","Επαναφορά":"Restore",
 "Η τρέχουσα βιβλιοθήκη θα αντικατασταθεί από αυτό το αντίγραφο. Συνέχεια;":"The current library will be replaced by this backup. Continue?",
 "Κράτηση των προσωρινών τραγουδιών του player στη βιβλιοθήκη":"Keep the player's temporary tracks in the library","Πλήρης οθόνη προγράμματος (F11)":"Program full screen (F11)","Υπάρχει αποθηκευμένη βιβλιοθήκη":"A saved library exists",
-"➕ Προσθήκη στην υπάρχουσα":"➕ Add to the existing one","🆕 Νέα βιβλιοθήκη (διαγραφή της παλιάς)":"🆕 New library (delete the old one)","Άκυρο":"Cancel","Η αποθηκευμένη βιβλιοθήκη θα διαγραφεί από τον browser. Συνέχεια;":"The saved library will be deleted from the browser. Continue?",
+"➕ Προσθήκη στην υπάρχουσα":"➕ Add to the existing one","🆕 Νέα βιβλιοθήκη (διαγραφή της παλιάς)":"🆕 New library (delete the old one)","Η αποθηκευμένη βιβλιοθήκη θα διαγραφεί από τον browser. Συνέχεια;":"The saved library will be deleted from the browser. Continue?",
 "Παράλειψη διπλότυπων αρχείων (ίδιο όνομα και μέγεθος)":"Skip duplicate files (same name and size)",
 "💾 Κράτηση τραγουδιών του player στη βιβλιοθήκη":"💾 Keep player tracks in the library","Δεν υπάρχουν προσωρινά τραγούδια":"There are no temporary tracks",
 "Αυτόματο άνοιγμα προηγούμενης βιβλιοθήκης":"Open the previous library automatically",
@@ -1396,7 +1398,6 @@ function renderQ(){const rest=Q.slice(Math.max(qi,0)).reduce((a,t)=>a+(t.dur||0)
 function openQ(show){$("qpanel").classList.toggle("hide",!show);$("app").classList.toggle("hasq",show);if(show)renderQ()}
 $("pq").onclick=()=>openQ($("qpanel").classList.contains("hide"));
 {const _cue=cue;cue=function(i){if(!xfCue)ghKill();amFired=false;amSt=0;amCv=AMX?((AMX.per&&cur&&AMX.per.get(cur)&&AMX.per.get(cur).cv)||AMX.cv):undefined;ghCv=amCv;amFiCur=AMX?(AMX.per&&cur&&AMX.per.get(cur)?+AMX.per.get(cur).fin||0:+AMX.fin||0):0;{const nt=Q[i];if(AMX&&nt&&nt.mix){amFiCur=nt.mix.i1>nt.mix.i0?nt.mix.i1-nt.mix.i0:0;if(nt.mix.cv&&nt.mix.cv!=="auto")amCv=nt.mix.cv}}_cue(i);if(fadeSec||(AMX&&amFiCur>0))au.volume=.05;else if(AMX)au.volume=1;amWarm();if(V.where!=="off"||S.wave)vizLoadPcm(cur);syncPlayer();renderQ();fsUpdate();if(S.autoFS&&$("fs").classList.contains("hide"))openFS()};const _bq=buildQ;buildQ=function(f){_bq(f);renderQ()};const _sq=startQ;startQ=function(l,t,f){if(!relinkSkip&&!relinkBusy&&DIRS.length&&((t&&!t.file)||(!t&&!l.some(x=>x.file)))){relinkBusy=true;syncDirs(DIRS,true).finally(()=>{relinkBusy=false;relinkSkip=true;try{startQ(l,t,f)}finally{relinkSkip=false}});return}_sq(l,t,f);if(Q.length>1&&(S.queue==="always"||(S.queue==="playlist"&&selPL)))openQ(true)}}
-$("am_go")&&0;
 function fsUpdate(){if($("fs").classList.contains("hide"))return;const t=cur;if(!t)return;
  $("fscv").style.backgroundImage=t.cover?`url(${t.cover})`:"";$("fscv").classList.toggle("vinyl",!t.cover);
  $("fstitle").textContent=t.title||t.fname;$("fsartist").textContent=t.artist||"";
@@ -1605,9 +1606,9 @@ function restoreLib(){return restoring||(restoring=(async()=>{if(!(S.persist&&!T
   if(tr.length){pmk("idb read");addPL(rec&&rec.playlists);mergeTracks(tr,true);pmk("library shown");toast(`Ανακτήθηκε η βιβλιοθήκη (${tr.length} τραγούδια)`);idbDirty=leg;if(!leg)T.forEach(t=>{const{file,cover,...r}=t;if(cover)r.cv=covId(cover);SIG.set(t.id,JSON.stringify(r))})}}catch(e){console.error(e)};STORED=0;const rb=$("resume");if(rb)rb.classList.add("hide")})())}
 (async()=>{DIRS=await dirsAll();
  if(NATIVE){try{const i=await window.desktop.native.libInfo();STORED=i&&i.exists?(i.count||0):0}catch(e){}}else if(S.persist){try{STORED=(await idbDo("readonly",st=>st.count(),"tracks"))||0;if(!STORED){const rec=await idbDo("readonly",st=>st.get("main"),"lib");STORED=rec&&Array.isArray(rec.tracks)?rec.tracks.length:0}}catch(e){}}
- if(STORED&&S.autoopen)await restoreLib();
+ if(STORED&&S.autoopen){$("welcome").classList.add("hide");$("app").classList.remove("hide");$("webst").textContent=`⏳ Φόρτωση βιβλιοθήκης (${STORED})…`;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r,30)));try{await restoreLib()}finally{$("webst").textContent=""}}
  else if(STORED){const rb=$("resume");rb.textContent=`↩ Συνέχεια με την προηγούμενη βιβλιοθήκη (${STORED} τραγούδια)`;rb.classList.remove("hide");rb.onclick=async()=>{rb.disabled=true;await restoreLib()}}
- refreshLinks();if(S.autolink&&S.autoopen&&DIRS.length&&!T.length)autoLink()})();
+ refreshLinks();if(S.autolink&&S.autoopen&&DIRS.length&&!T.length)setTimeout(()=>autoLink(),3000)})();
 
 /* ===== v12: playlist export ===== */
 function exportList(scope){if(scope==="lib")return T;if(scope==="queue")return Q;
@@ -1660,7 +1661,7 @@ function qdDraw(){const m=$("modal");if(m.classList.contains("hide")&&!$("qd_dro
  <div class="qdrop" id="qd_drop">Σύρε εδώ έναν ή περισσότερους φακέλους, ή χρησιμοποίησε το κουμπί</div>
  ${QD.map((d,i)=>`<div><div class="mr"><span>📁</span><span class="ell">${esc(d.name)}</span><span class="mu">${d.counting?"Μέτρηση…":qdCount(d)+" αρχεία"}</span>${d.subs.length?`<button class="ib" data-qd="open" data-i="${i}" title="Υποφάκελοι">${d.open?"▴":"▾"}</button>`:""}<button class="ib" data-qd="rm" data-i="${i}">✕</button></div>
   ${d.open?`<div class="qsubs"><div class="mt"><button class="sm" data-qd="all" data-i="${i}">Όλα</button><button class="sm" data-qd="none" data-i="${i}">Κανένα</button></div>${d.subs.map((s,j)=>`<label class="mr"><input type="checkbox" data-qs="${i},${j}" ${s.on?"checked":""}><span class="ell">${esc(s.name)}</span><span class="mu">${s.count}</span></label>`).join("")}${d.root?`<div class="mu" style="font-size:13px">+ ${d.root} αρχεία στον κεντρικό φάκελο</div>`:""}</div>`:""}</div>`).join("")}
- <div class="mt" style="margin-top:8px"><button class="sm" id="qd_add">➕ Επιλογή φακέλου…</button></div>
+ <div class="mt" style="margin-top:8px"><button class="sm" id="qd_add">➕ Επιλογή φακέλου…</button>${QD.length?'<button class="sm" id="qd_play" title="Παίζει τα τραγούδια χωρίς να τα προσθέσει ή να φορτώσει τη βιβλιοθήκη">▶ Παίξε μόνο, χωρίς βιβλιοθήκη</button>':""}</div>
  <label class="mr"><input type="checkbox" id="qd_sub" ${qdOpts.sub?"checked":""}><span class="ell">Συμπερίληψη όλων των υποφακέλων</span></label>
  ${hasFS?`<label class="mr"><input type="checkbox" id="qd_link" ${qdOpts.link?"checked":""}><span class="ell">Σύνδεση φακέλων (θυμάμαι και ελέγχω για νέα τραγούδια)</span></label>`:""}
  <div class="mt" style="margin-top:14px"><button class="big" id="qd_go" style="padding:10px 22px;font-size:15px" ${total?"":"disabled"}>Προσθήκη στη βιβλιοθήκη (${total})</button></div></div>`;
@@ -1669,7 +1670,7 @@ function qdDraw(){const m=$("modal");if(m.classList.contains("hide")&&!$("qd_dro
  $("qd_sub").onchange=e=>{qdOpts.sub=e.target.checked?1:0;qdDraw()};if($("qd_link"))$("qd_link").onchange=e=>{qdOpts.link=e.target.checked?1:0};
  m.querySelectorAll("[data-qd]").forEach(b=>b.onclick=()=>{const i=+b.dataset.i,a=b.dataset.qd;if(a==="rm")QD.splice(i,1);else if(a==="open")QD[i].open=!QD[i].open;else QD[i].subs.forEach(s=>s.on=a==="all");qdDraw()});
  m.querySelectorAll("[data-qs]").forEach(c=>c.onchange=()=>{const[i,j]=c.dataset.qs.split(",").map(Number);QD[i].subs[j].on=c.checked;qdDraw()});
- $("qd_go").onclick=qdGo}
+ $("qd_go").onclick=qdGo;if($("qd_play"))$("qd_play").onclick=qdPlay}
 async function qdGo(){const files=[],link=hasFS&&qdOpts.link;$("modal").classList.add("hide");
  for(const d of QD){const ex=d.subs.filter(s=>!s.on).map(s=>s.name);
   if(d.handle){let rec=link?await rememberDir(d.handle):null;if(rec){rec.sub=!!qdOpts.sub;rec.ex=ex;try{await dirPut(rec)}catch(e){}}else rec={name:d.name,handle:d.handle,sub:!!qdOpts.sub,ex};
@@ -1677,6 +1678,11 @@ async function qdGo(){const files=[],link=hasFS&&qdOpts.link;$("modal").classLis
   else files.push(...d.files.filter(f=>{const p=(f.webkitRelativePath||f.fullPath||"").replace(/^\/+/,"").split("/");return p.length<=2||(qdOpts.sub&&!ex.includes(p[1]))}))}
  QD=[];$("webst").textContent="";refreshLinks();
  if(files.length)await load(files,true);else toast("Δεν βρέθηκαν αρχεία μουσικής")}
+async function qdPlay(){const files=[];$("modal").classList.add("hide");
+ for(const d of QD){const ex=d.subs.filter(s=>!s.on).map(s=>s.name);
+  if(d.handle){const r=await collectDirs([{name:d.name,handle:d.handle,sub:!!qdOpts.sub,ex}],true);files.push(...r.files)}
+  else files.push(...d.files.filter(f=>{const p=(f.webkitRelativePath||f.fullPath||"").replace(/^\/+/,"").split("/");return p.length<=2||(qdOpts.sub&&!ex.includes(p[1]))}))}
+ QD=[];$("webst").textContent="";if(files.length)await playDropped(files);else toast("Δεν βρέθηκαν αρχεία μουσικής")}
 $("fq").onchange=e=>{const f=[...e.target.files];e.target.value="";qdAddFiles(f)};
 async function checkNew(ask,silent){if(checking||!DIRS.length)return;checking=true;lastCheck=Date.now();
  try{const g=[];for(const d of DIRS)if(await perm(d.handle,ask))g.push(d);
@@ -1753,6 +1759,8 @@ async function playDropped(files){
 function syncEmpty(){let h=$("ponly");if(!h){h=document.createElement("div");h.id="ponly";h.className="hide";h.innerHTML='<div>🎧 Σύρε αρχεία ή φακέλους εδώ για να παίξουν</div><div class="mu">Δεν χρειάζεται βιβλιοθήκη</div><div class="btns"><button class="sm" id="po_f">🎵 Αρχεία…</button><button class="sm" id="po_d">📁 Φάκελοι…</button></div>';document.body.appendChild(h);$("po_f").onclick=()=>$("ff").click();$("po_d").onclick=()=>pickFolders()}
  h.classList.toggle("hide",!!T.length||$("app").classList.contains("hide")||!!cur)}
 const _r0=render;render=function(){const r=_r0.apply(this,arguments);syncEmpty();return r};setInterval(syncEmpty,1500);
+["playd","wplayd"].forEach(i=>$(i)&&($(i).onclick=()=>{$("fpd").click()}));["playf","wplayf"].forEach(i=>$(i)&&($(i).onclick=()=>{$("fpf").click()}));
+$("fpd").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)playDropped(f)};$("fpf").onchange=e=>{const f=[...e.target.files];e.target.value="";if(f.length)playDropped(f)};
 $("pickp").onclick=()=>{try{$("welcome").classList.add("hide");$("app").classList.remove("hide");render()}catch(e){console.error(e);toast("Σφάλμα: "+(e&&e.message||e))}};
 const _al=autoLink;autoLink=async function(){const a=performance.now();try{return await _al.apply(this,arguments)}finally{PERF.m["folder link"]=Math.round(performance.now()-a)}};
 $("m_audio").innerHTML=audioHTML();audioBind();document.querySelector('[data-pm="m_audio"]').addEventListener("click",()=>fillDevs(false));
@@ -2945,10 +2953,15 @@ document.addEventListener("click",ctxClose);document.addEventListener("scroll",(
 document.addEventListener("keydown",e=>{if(e.key==="Escape")ctxClose()});
 document.addEventListener("contextmenu",e=>{const row=e.target.closest&&e.target.closest("#content [data-i]");if(!row)return;const t=T[+row.dataset.i];if(!t)return;e.preventDefault();ctxClose();
  const d=document.createElement("div");d.id="ctxm";
- const items=[["play","▶ Αναπαραγωγή",!!t.file],["mix","✂ Σημεία fade in / fade out…"+(t.mix?"  ✓":""),!!t.file],["pl","🎶 Προσθήκη στη playlist…",true],["ed","✏️ Επεξεργασία στοιχείων…",true]];
+ const items=[["play","▶ Αναπαραγωγή",!!t.file],["mix","✂ Σημεία fade in / fade out…"+(t.mix?"  ✓":""),!!t.file],["pl","🎶 Προσθήκη στη playlist…",true],["sf","📂 Εμφάνιση φακέλου",true],["ed","✏️ Επεξεργασία στοιχείων…",true]];
  d.innerHTML=items.map(([k,l,ok])=>`<button data-k="${k}"${ok?"":" disabled"}>${l}</button>`).join("");document.body.appendChild(d);
  d.style.left=Math.max(4,Math.min(e.clientX,innerWidth-d.offsetWidth-6))+"px";d.style.top=Math.max(4,Math.min(e.clientY,innerHeight-d.offsetHeight-6))+"px";
- d.onclick=ev=>{const b=ev.target.closest("button");if(!b||b.disabled)return;ev.stopPropagation();ctxClose();({play:()=>startQ(lastL,t),mix:()=>mixEditor(t),pl:()=>pickPL([t]),ed:()=>editTrack(t)})[b.dataset.k]()};CTX=d;d.__t=performance.now()});
+ d.onclick=ev=>{const b=ev.target.closest("button");if(!b||b.disabled)return;ev.stopPropagation();ctxClose();({play:()=>startQ(lastL,t),mix:()=>mixEditor(t),pl:()=>pickPL([t]),sf:()=>showFolder(t),ed:()=>editTrack(t)})[b.dataset.k]()};CTX=d;d.__t=performance.now()});
+function trackAbs(t){if(t.file&&t.file.abs)return t.file.abs;
+ if(NATIVE){const p=String(t.path||"").split("/").filter(Boolean);for(const d of DIRS||[]){const r=d.handle&&d.handle.path;if(r&&p[0]===d.name)return nJoin(r,p.slice(1).join("/"))}}return""}
+async function showFolder(t){const ab=trackAbs(t);
+ if(NATIVE&&ab){try{if(await window.desktop.native.showItem(ab))return}catch(e){}toast("Δεν ήταν δυνατό να ανοίξει ο φάκελος")}
+ else{const f=ab?ab.replace(/[\\/][^\\/]*$/,""):(t.path||"").split("/").slice(0,-1).join("/")||t.folder||"—";let ok=false;try{await navigator.clipboard.writeText(f);ok=true}catch(e){}toast("📂 "+f+(ok?"  (αντιγράφηκε)":""))}}
 const mxT=s=>{s=Math.max(0,s||0);const m=Math.floor(s/60);return m+":"+(s-m*60).toFixed(1).padStart(4,"0")};
 async function mixEditor(t){const m=$("modal");m.classList.remove("hide");
  m.innerHTML=`<div class="mc" style="max-width:880px"><div class="mh"><h2>✂ Σημεία fade — ${esc(t.title||t.fname)}</h2><button class="x">×</button></div><p class="mu">⏳ Φόρτωση κυματομορφής…</p></div>`;
