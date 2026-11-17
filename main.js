@@ -266,6 +266,12 @@ function registerIpc() {
   handle('lib:backups', () => store.backups());
   handle('lib:backupNow', () => store.backupNow());
   handle('lib:backup', (name) => store.readBackup(name));
+  handle('native:showItem', (p) => {
+    p = String(p || '');
+    if (!path.isAbsolute(p)) return false;
+    shell.showItemInFolder(p);
+    return true;
+  });
   handle('lib:openDir', () => shell.openPath(store.dir));
 
   ipcMain.on('native:watch', (e, paths) => {
