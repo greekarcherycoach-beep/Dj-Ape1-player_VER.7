@@ -790,7 +790,7 @@ setInterval(()=>{if(auto&&dirty&&fh)saveLib(true)},8000);
 const au=$("au");
 function shuffled(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function buildQ(first){Q=shuf?[first,...shuffled(QL.filter(x=>x!==first))]:QL.slice();qi=Q.indexOf(first)}
-function startQ(list,t,fade){fadeSec=fade||0;AMX=pendingAMX;pendingAMX=null;if(!fadeSec)au.volume=1;QL=list.filter(x=>x.file);
+function startQ(list,t,fade){fadeSec=fade||0;AMX=pendingAMX||(list&&list.some(x=>x&&x.mix)?{fout:0,fin:0,ov:true,trimS:false,trimE:false,smart:false,thr:-50,man:1}:null);pendingAMX=null;if(!fadeSec)au.volume=1;QL=list.filter(x=>x.file);
  if(!QL.length){toast("Για αναπαραγωγή πρόσθεσε ξανά τον φάκελο με τα αρχεία (➕ Προσθήκη φακέλου)");return}
  if(!t||!t.file)t=shuf?QL[Math.random()*QL.length|0]:QL[0];buildQ(t);cue(qi)}
 function cue(i){qi=i;cur=Q[i];COUNTED.delete(cur);if(curUrl){const o=curUrl;setTimeout(()=>URL.revokeObjectURL(o),30000)}curUrl=cur.file.native?cur.file.url:URL.createObjectURL(cur.file);au.src=curUrl;au.play().catch(()=>{});
@@ -804,7 +804,7 @@ function next(){if(!Q.length)return;if(qi+1<Q.length)cue(qi+1);else if(rep===1)c
 function prev(){if(!Q.length)return;if(au.currentTime>3||qi===0)au.currentTime=0;else cue(qi-1)}
 au.onended=()=>{if(rep===2){au.currentTime=0;au.play()}else next()};
 au.onplay=()=>{$("pplay").textContent="⏸";document.body.classList.add("playing")};au.onpause=()=>{$("pplay").textContent="▶";document.body.classList.remove("playing")};
-au.addEventListener("loadedmetadata",()=>{amSt=0;if(AMX&&AMX.trimS&&!S.hifi&&cur&&cur.pts&&cur.pts.s>.15&&cur.pts.s<au.duration-1){amSt=cur.pts.s;try{au.currentTime=amSt}catch(e){}}});
+au.addEventListener("loadedmetadata",()=>{amSt=0;const mm0=cur&&cur.mix;if(AMX&&!S.hifi&&mm0&&mm0.i0>.15&&mm0.i0<au.duration-1){amSt=mm0.i0;try{au.currentTime=amSt}catch(e){}}else if(AMX&&AMX.trimS&&!S.hifi&&cur&&cur.pts&&cur.pts.s>.15&&cur.pts.s<au.duration-1){amSt=cur.pts.s;try{au.currentTime=amSt}catch(e){}}});
 au.onloadedmetadata=()=>{$("pdur").textContent=mmss(au.duration);if(cur&&!cur.dur&&isFinite(au.duration))cur.dur=au.duration};
 au.ontimeupdate=()=>{$("pcur").textContent=mmss(au.currentTime);if(au.duration)$("pseek").value=au.currentTime/au.duration*1000};
 $("pseek").oninput=e=>{if(au.duration)au.currentTime=e.target.value/1000*au.duration};
@@ -1020,7 +1020,9 @@ function ddBind(id,cb){const d=$(id);d.querySelectorAll("input").forEach(i=>i.on
 
 /* ===== Automix ===== */
 let fadeSec=0;
-let gh=null,ghT0=0,ghL=0,xf=false,xfCue=false,amSkip=false,AMX=null,pendingAMX=null,amFired=false,amSt=0,amFiCur=0;
+let amCv,ghCv,ghLast=0,gh=null,ghT0=0,ghL=0,xf=false,xfCue=false,amSkip=false,AMX=null,pendingAMX=null,amFired=false,amSt=0,amFiCur=0;
+const eqp=x=>Math.sin(Math.max(0,Math.min(1,x))*Math.PI/2); /* equal-power fade curve */
+const fcv=(x,c)=>c==="lin"?Math.max(0,Math.min(1,x)):eqp(x); /* c: "eq" (equal-power, default) or "lin" (linear) */
 function ghKill(){if(gh){try{gh.pause()}catch(e){}gh=null}xf=false}
 /* ---- Automix points: silence at start/end, intro end, outro start (per track, cached in t.pts) ---- */
 const PTSB=new WeakSet();
@@ -1041,17 +1043,20 @@ function amCalc(){const c=cur,A0=AMX;if(!c||!au.duration)return null;const A=A0.
  let end=A.trimE&&pc?Math.min(dur,Math.max(pc.e,1)):dur,L=Math.max(0,Math.min(+A.fout||0,end/3)),fi=Math.max(0,+A.fin||0),T;
  if(n&&A.smart&&pc){const sc=mixScore(c,n,false);L*=sc>=80?1:sc>=60?.7:.4;if(+A.fout>0)L=Math.max(Math.min(2,+A.fout),L);fi=Math.min(fi,Math.max(2,L))}
  if(n&&A.smart&&pc&&pc.o&&pc.o<end&&end-pc.o>=L&&pc.o>dur*.3){T=pc.o;end=Math.min(end,T+L)}else T=end-L;
- return{T,L,end,fi,ov:!!A.ov&&!!n&&L>.2}}
+ const mm=c.mix,nm=n&&n.mix;let man=false,cvO=A.cv,cvI=A.cv;if(mm&&mm.o0>1&&mm.o0<dur-.3){T=mm.o0;end=mm.o1>mm.o0?Math.min(dur,mm.o1):T;L=Math.max(0,end-T);man=true}
+ if(mm&&mm.cv&&mm.cv!=="auto")cvO=mm.cv;cvI=cvO;if(nm){fi=nm.i1>nm.i0?nm.i1-nm.i0:0;if(nm.cv&&nm.cv!=="auto")cvI=nm.cv}
+
+ return{T,L,end,fi,cv:cvO,cvI,ov:(man||!!A.ov)&&!!n&&L>.2}}
 function amTick(){const pl=amCalc();if(!pl)return;const t=au.currentTime,hasNext=!!amNext();
- if(pl.ov&&!gh&&!amFired&&t>1&&t>=pl.T-2.5&&t<pl.T+.5){const g=new Audio();if(S.sink&&g.setSinkId)g.setSinkId(S.sink).catch(()=>{});g.src=curUrl;g.muted=true;g.preload="auto";try{g.currentTime=t}catch(e){}g.ready=false;gh=g;g.play().then(()=>{if(gh===g)g.ready=true}).catch(()=>{if(gh===g)gh=null})}
- if(pl.ov&&gh&&!xf&&gh.ready&&!amFired&&t>=pl.T){amFired=true;try{gh.currentTime=au.currentTime}catch(e){}gh.muted=false;gh.volume=1;xf=true;ghT0=performance.now();ghL=pl.L;xfCue=true;try{next()}finally{xfCue=false}au.volume=.05;amFiCur=pl.fi;return}
+ if(pl.ov&&!gh&&!amFired&&t>1&&t>=pl.T-8&&t<pl.T+.5&&performance.now()-ghLast>1200){ghLast=performance.now();const g=new Audio();if(S.sink&&g.setSinkId)g.setSinkId(S.sink).catch(()=>{});g.src=curUrl;g.muted=true;g.preload="auto";try{g.currentTime=t}catch(e){}g.ready=false;gh=g;g.play().then(()=>{if(gh===g)g.ready=true}).catch(()=>{if(gh===g)gh=null})}
+ if(pl.ov&&gh&&!xf&&gh.ready&&!amFired&&t>=pl.T){amFired=true;try{if(Math.abs(gh.currentTime-au.currentTime)>.08)gh.currentTime=au.currentTime}catch(e){}gh.muted=false;gh.volume=1;xf=true;ghT0=performance.now();ghL=pl.L;ghCv=pl.cv;xfCue=true;try{next()}finally{xfCue=false}au.volume=.05;amFiCur=pl.fi;amCv=pl.cvI;return}
  if(!amFired&&hasNext!==undefined&&t>=pl.end-.05&&pl.end<au.duration-.2){amFired=true;if(au.onended)au.onended();return}
- let vol=1;if(amFiCur>0)vol=Math.min(vol,(t-amSt)/amFiCur+.04);if(pl.L>0&&t>=pl.T)vol=Math.min(vol,Math.max(0,(pl.end-t)/pl.L));
+ let vol=1;if(amFiCur>0)vol=Math.min(vol,fcv((t-amSt)/amFiCur,amCv)+.04);if(pl.L>0&&t>=pl.T)vol=Math.min(vol,fcv((pl.end-t)/pl.L,pl.cv));
  au.volume=Math.max(0,Math.min(1,vol))}
 au.addEventListener("seeked",()=>{amFired=false});
 setInterval(()=>{
  if(S.hifi&&(fadeSec||gh)){fadeSec=0;ghKill();au.volume=1}
- if(gh&&xf){const k=1-(performance.now()-ghT0)/1000/Math.max(.5,ghL||fadeSec||1);if(k<=0)ghKill();else gh.volume=Math.max(0,Math.min(1,k))}
+ if(gh&&xf){const k=1-(performance.now()-ghT0)/1000/Math.max(.5,ghL||fadeSec||1);if(k<=0)ghKill();else gh.volume=fcv(k,ghCv)}
  if(AMX&&!S.hifi&&cur&&au.duration&&!au.paused){amTick();return}
  if(!fadeSec||!au.duration||au.paused)return;
  const F=Math.max(.5,Math.min(fadeSec,au.duration/3)),left=au.duration-au.currentTime,hasNext=rep!==2&&(qi+1<Q.length||rep===1);
@@ -1390,7 +1395,7 @@ function renderQ(){const rest=Q.slice(Math.max(qi,0)).reduce((a,t)=>a+(t.dur||0)
  if(!$("fs").classList.contains("hide")){$("fsqh").innerHTML=Q.length?`<span>Ουρά αναπαραγωγής · ${hdr}</span> <button class="sm" id="fsqhide" title="Απόκρυψη λίστας">🙈 Απόκρυψη</button>`:"";if($("fsqhide"))$("fsqhide").onclick=()=>toggleFsq();$("fsq").innerHTML=qHTML();bindQ($("fsq"))}}
 function openQ(show){$("qpanel").classList.toggle("hide",!show);$("app").classList.toggle("hasq",show);if(show)renderQ()}
 $("pq").onclick=()=>openQ($("qpanel").classList.contains("hide"));
-{const _cue=cue;cue=function(i){if(!xfCue)ghKill();amFired=false;amSt=0;amFiCur=AMX?(AMX.per&&cur&&AMX.per.get(cur)?+AMX.per.get(cur).fin||0:+AMX.fin||0):0;_cue(i);if(fadeSec||(AMX&&amFiCur>0))au.volume=.05;else if(AMX)au.volume=1;amWarm();if(V.where!=="off"||S.wave)vizLoadPcm(cur);syncPlayer();renderQ();fsUpdate();if(S.autoFS&&$("fs").classList.contains("hide"))openFS()};const _bq=buildQ;buildQ=function(f){_bq(f);renderQ()};const _sq=startQ;startQ=function(l,t,f){if(!relinkSkip&&!relinkBusy&&DIRS.length&&((t&&!t.file)||(!t&&!l.some(x=>x.file)))){relinkBusy=true;syncDirs(DIRS,true).finally(()=>{relinkBusy=false;relinkSkip=true;try{startQ(l,t,f)}finally{relinkSkip=false}});return}_sq(l,t,f);if(Q.length>1&&(S.queue==="always"||(S.queue==="playlist"&&selPL)))openQ(true)}}
+{const _cue=cue;cue=function(i){if(!xfCue)ghKill();amFired=false;amSt=0;amCv=AMX?((AMX.per&&cur&&AMX.per.get(cur)&&AMX.per.get(cur).cv)||AMX.cv):undefined;ghCv=amCv;amFiCur=AMX?(AMX.per&&cur&&AMX.per.get(cur)?+AMX.per.get(cur).fin||0:+AMX.fin||0):0;{const nt=Q[i];if(AMX&&nt&&nt.mix){amFiCur=nt.mix.i1>nt.mix.i0?nt.mix.i1-nt.mix.i0:0;if(nt.mix.cv&&nt.mix.cv!=="auto")amCv=nt.mix.cv}}_cue(i);if(fadeSec||(AMX&&amFiCur>0))au.volume=.05;else if(AMX)au.volume=1;amWarm();if(V.where!=="off"||S.wave)vizLoadPcm(cur);syncPlayer();renderQ();fsUpdate();if(S.autoFS&&$("fs").classList.contains("hide"))openFS()};const _bq=buildQ;buildQ=function(f){_bq(f);renderQ()};const _sq=startQ;startQ=function(l,t,f){if(!relinkSkip&&!relinkBusy&&DIRS.length&&((t&&!t.file)||(!t&&!l.some(x=>x.file)))){relinkBusy=true;syncDirs(DIRS,true).finally(()=>{relinkBusy=false;relinkSkip=true;try{startQ(l,t,f)}finally{relinkSkip=false}});return}_sq(l,t,f);if(Q.length>1&&(S.queue==="always"||(S.queue==="playlist"&&selPL)))openQ(true)}}
 $("am_go")&&0;
 function fsUpdate(){if($("fs").classList.contains("hide"))return;const t=cur;if(!t)return;
  $("fscv").style.backgroundImage=t.cover?`url(${t.cover})`:"";$("fscv").classList.toggle("vinyl",!t.cover);
@@ -1928,22 +1933,28 @@ document.addEventListener("keydown",e=>{if(e.ctrlKey&&e.shiftKey&&String(e.key).
 /* ===== v21b: playlists reachable without the sidebar ===== */
 $("plsmart2").onclick=()=>smartModal();
 /* ===== Dj mode: shared transitions block (fade in/out, silence trimming, smart mix points) ===== */
-const FXD={fo:6,fi:4,ov:1,ts:0,te:0,st:-50,sp:0};
+const FXD={fo:6,fi:4,ov:1,ts:0,te:0,st:-50,sp:0,cv:"eq",px:""};
 const fxLoad=()=>{try{return{...FXD,...JSON.parse(localStorage.getItem("mldjfx")||"{}")}}catch(e){return{...FXD}}};
 function fxHTML(p){const f=fxLoad(),o=(v,l)=>`<option value="${v}"${+f.st===v?" selected":""}>${l}</option>`;
  return `<details class="dd" id="${p}_fx" style="margin-bottom:10px" open><summary>🎚 Μεταβάσεις (fade / σιωπή / έξυπνα σημεία)</summary><div style="padding:8px 12px;display:grid;gap:8px">
+  <label class="rrow"><span class="mu">Τρόπος μίξης (έτοιμες ρυθμίσεις)</span><select id="${p}_fxs"><option value="">Χειροκίνητα (οι ρυθμίσεις από κάτω)</option>${Object.entries(MXS).map(([k,v])=>`<option value="${k}"${f.px===k?" selected":""}>${v.n}</option>`).join("")}</select></label>
   <label class="rrow"><span class="mu">Fade out (δευτ.)</span><input id="${p}_fo" type="number" min="0" max="40" step="0.5" value="${f.fo}" style="width:80px"></label>
   <label class="rrow"><span class="mu">Fade in (δευτ.)</span><input id="${p}_fi" type="number" min="0" max="40" step="0.5" value="${f.fi}" style="width:80px"></label>
   <label class="rrow"><input type="checkbox" id="${p}_ov"${f.ov?" checked":""}> Επικάλυψη: το επόμενο τραγούδι ξεκινά όταν αρχίζει το fade out</label>
   <label class="rrow"><input type="checkbox" id="${p}_ts"${f.ts?" checked":""}> Αφαίρεση σιωπής στην αρχή του τραγουδιού</label>
   <label class="rrow"><input type="checkbox" id="${p}_te"${f.te?" checked":""}> Αφαίρεση σιωπής στο τέλος του τραγουδιού</label>
   <label class="rrow"><span class="mu">Όριο σιωπής</span><select id="${p}_st">${o(-60,"-60 dB (πολύ χαμηλό)")}${o(-50,"-50 dB")}${o(-40,"-40 dB (πιο επιθετικό)")}</select></label>
-  <label class="rrow"><input type="checkbox" id="${p}_sp"${f.sp?" checked":""}> 🧠 Έξυπνα σημεία μίξης: το πρόγραμμα διαλέγει πότε θα γίνει η μετάβαση (outro → intro, στο beat) και πόσο θα διαρκεί, ανάλογα με το πόσο ταιριάζουν τα δύο τραγούδια</label></div></details>`}
-const fxCfg=p=>{const g=id=>$(p+"_"+id);return{fout:Math.max(0,+g("fo").value||0),fin:Math.max(0,+g("fi").value||0),ov:g("ov").checked,trimS:g("ts").checked,trimE:g("te").checked,smart:g("sp").checked,thr:+g("st").value||-50}};
+  <label class="rrow"><input type="checkbox" id="${p}_sp"${f.sp?" checked":""}> 🧠 Έξυπνα σημεία μίξης: το πρόγραμμα διαλέγει πότε θα γίνει η μετάβαση (outro → intro, στο beat) και πόσο θα διαρκεί, ανάλογα με το πόσο ταιριάζουν τα δύο τραγούδια</label>
+  <label class="rrow"><span class="mu">Καμπύλη μίξης</span><select id="${p}_fxc"><option value="eq"${f.cv!=="lin"?" selected":""}>Ισχύος (equal-power) — ομαλή, σταθερή αίσθηση έντασης</option><option value="lin"${f.cv==="lin"?" selected":""}>Γραμμική (linear) — σταθερό άθροισμα, για beatmix με ίδιο tempo/key</option></select></label></div></details>`}
+const fxCfg=p=>{const g=id=>$(p+"_"+id);return{fout:Math.max(0,+g("fo").value||0),fin:Math.max(0,+g("fi").value||0),ov:g("ov").checked,trimS:g("ts").checked,trimE:g("te").checked,smart:g("sp").checked,thr:+g("st").value||-50,cv:g("fxc")?g("fxc").value:"eq"}};
 const fxAny=c=>!!c&&(c.fout>0||c.fin>0||c.trimS||c.trimE||c.smart);
 /* one settings set shared by every Dj mode tab: saved on every change */
 document.addEventListener("change",e=>{const d=e.target.closest&&e.target.closest('details[id$="_fx"]');if(!d)return;const p=d.id.slice(0,-3),g=id=>$(p+"_"+id);
- try{localStorage.setItem("mldjfx",JSON.stringify({fo:+g("fo").value||0,fi:+g("fi").value||0,ov:g("ov").checked?1:0,ts:g("ts").checked?1:0,te:g("te").checked?1:0,st:+g("st").value||-50,sp:g("sp").checked?1:0}))}catch(x){}});
+ try{localStorage.setItem("mldjfx",JSON.stringify({fo:+g("fo").value||0,fi:+g("fi").value||0,ov:g("ov").checked?1:0,ts:g("ts").checked?1:0,te:g("te").checked?1:0,st:+g("st").value||-50,sp:g("sp").checked?1:0,cv:g("fxc")?g("fxc").value:"eq",px:g("fxs")?g("fxs").value:""}))}catch(x){}});
+/* choosing a ready-made mix style fills the fields; editing a field switches back to manual */
+document.addEventListener("change",e=>{const el=e.target,d=el&&el.closest&&el.closest('details[id$="_fx"]');if(!d||!el.id)return;const p=d.id.slice(0,-3),g=id=>$(p+"_"+id);
+ if(el.id===p+"_fxs"){const s=MXS[el.value];if(s){g("fo").value=s.fout;g("fi").value=s.fin;g("ov").checked=!!s.ov;g("sp").checked=!!s.smart}}
+ else if(["fo","fi","ov","sp"].some(k=>el.id===p+"_"+k)&&g("fxs"))g("fxs").value=""},true);
 /* analyses silence / intro / outro points for tracks that do not have them yet (skippable) */
 async function djPts(list,c,setMsg,skipFn){if(!c||!(c.trimS||c.trimE||c.smart))return;const need=list.filter(t=>t.file&&(!t.pts||t.pts.th!==c.thr));
  for(let i=0;i<need.length;i++){if(skipFn&&skipFn())break;setMsg(`✂ Ανάλυση σημείων μίξης ${i+1}/${need.length}…`);await analyzePoints(need[i],c.thr)}}
@@ -2060,6 +2071,10 @@ const MXS={blend:{n:"Μακρύ blend 16΄΄ (chill / deep)",fout:16,fin:12,ov:t
  club:{n:"Tight beatmix 4΄΄ (house / techno)",fout:4,fin:3,ov:true,smart:true},cut:{n:"Γρήγορο cut 1΄΄ (rock / dub)",fout:1,fin:.5,ov:true,smart:false},
  fade:{n:"Fade out → fade in, χωρίς επικάλυψη (γέφυρα)",fout:6,fin:4,ov:false,smart:false}};
 const MXO=[["auto","Μίξη: γενικές ρυθμίσεις"],...Object.entries(MXS).map(([k,v])=>[k,v.n])];
+const CVO=[["auto","Καμπύλη: γενική"],["eq","Καμπύλη ισχύος"],["lin","Γραμμική καμπύλη"]];
+const optS=(L,v)=>L.map(([k,l])=>`<option value="${k}"${k===v?" selected":""}>${l}</option>`).join("");
+/* mix style of a phase (+ optional defaults) → object stored per track */
+const phStyle=(ph,dm,dc)=>{if(!ph)return null;const k=ph.mx&&ph.mx!=="auto"?ph.mx:dm,cv=ph.cv&&ph.cv!=="auto"?ph.cv:dc,mx=MXS[k];const c=cv&&cv!=="auto"?cv:null;if(!mx&&!c)return null;return{...(mx||{}),...(c?{cv:c}:{})}};
 const gTerms=s=>String(s||"").split(/[,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
 const gMatch=(t,terms)=>!terms.length||(t.genres||[]).some(g=>{g=String(g).toLowerCase();return terms.some(x=>g.includes(x))});
 
@@ -2192,8 +2207,8 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
   <span><button class="sm hide" id="wz_skip" data-a="skip">⏭ Παράλειψη ανάλυσης</button> <button class="big" id="wz_go" data-a="go" style="padding:10px 22px">🧭 Δημιουργία σετ</button></span></div></div>`;
  let step=1;const $$=s=>[...m.querySelectorAll(s)];
  const showStep=n=>{step=Math.max(1,Math.min(4,n));$$(".wz-s").forEach(e=>e.classList.toggle("hide",+e.dataset.n!==step));$$(".wz-pills button").forEach(b=>b.classList.toggle("on",+b.dataset.n===step))};
- const readPh=()=>$$("#wz_ph .wz-ph").map(r=>{const q=s=>r.querySelector(s);return{name:q(".pn").value||"Φάση",min:Math.max(1,+q(".pm").value||1),e0:Math.max(1,Math.min(10,+q(".p0").value||1)),e1:Math.max(1,Math.min(10,+q(".p1").value||1)),key:q(".pk").value,g:q(".pg").value.trim(),b1:Math.max(0,+q(".pb1").value||0),b2:Math.max(0,+q(".pb2").value||0),mx:q(".px").value}});
- const drawPh=()=>{$("wz_ph").innerHTML=WZ.phases.map((p,i)=>`<div class="wz-ph" data-i="${i}" style="border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"><div class="rrow"><input class="pn" value="${esc(p.name)}" style="width:104px"><input class="pm" type="number" min="1" max="600" value="${p.min}" style="width:58px"><span class="mu">΄ · ενέργεια</span><input class="p0" type="number" min="1" max="10" step="0.5" value="${p.e0}" style="width:54px"><span class="mu">→</span><input class="p1" type="number" min="1" max="10" step="0.5" value="${p.e1}" style="width:54px"><select class="pk">${opt(WZK,p.key)}</select><button class="sm" data-a="phup" title="Πάνω">↑</button><button class="sm" data-a="phdn" title="Κάτω">↓</button><button class="sm" data-a="phrm" title="Διαγραφή">✕</button></div><div class="rrow"><span class="mu">🎵</span><input class="pg" list="wz_gl" value="${esc(p.g||"")}" placeholder="είδος (κόμμα για πολλά) — κενό = όλα" style="flex:1;min-width:170px"><span class="mu">BPM</span><input class="pb1" type="number" min="30" max="220" value="${p.b1||""}" placeholder="γενικό" style="width:68px"><span class="mu">–</span><input class="pb2" type="number" min="30" max="220" value="${p.b2||""}" placeholder="γενικό" style="width:68px"><select class="px">${opt(MXO,p.mx||"auto")}</select><span class="mu pc" style="font-size:12px"></span></div></div>`).join("");tot();upd()};
+ const readPh=()=>$$("#wz_ph .wz-ph").map(r=>{const q=s=>r.querySelector(s);return{name:q(".pn").value||"Φάση",min:Math.max(1,+q(".pm").value||1),e0:Math.max(1,Math.min(10,+q(".p0").value||1)),e1:Math.max(1,Math.min(10,+q(".p1").value||1)),key:q(".pk").value,g:q(".pg").value.trim(),b1:Math.max(0,+q(".pb1").value||0),b2:Math.max(0,+q(".pb2").value||0),mx:q(".px").value,cv:q(".pcv")?q(".pcv").value:"auto"}});
+ const drawPh=()=>{$("wz_ph").innerHTML=WZ.phases.map((p,i)=>`<div class="wz-ph" data-i="${i}" style="border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"><div class="rrow"><input class="pn" value="${esc(p.name)}" style="width:104px"><input class="pm" type="number" min="1" max="600" value="${p.min}" style="width:58px"><span class="mu">΄ · ενέργεια</span><input class="p0" type="number" min="1" max="10" step="0.5" value="${p.e0}" style="width:54px"><span class="mu">→</span><input class="p1" type="number" min="1" max="10" step="0.5" value="${p.e1}" style="width:54px"><select class="pk">${opt(WZK,p.key)}</select><button class="sm" data-a="phup" title="Πάνω">↑</button><button class="sm" data-a="phdn" title="Κάτω">↓</button><button class="sm" data-a="phrm" title="Διαγραφή">✕</button></div><div class="rrow"><span class="mu">🎵</span><input class="pg" list="wz_gl" value="${esc(p.g||"")}" placeholder="είδος (κόμμα για πολλά) — κενό = όλα" style="flex:1;min-width:170px"><span class="mu">BPM</span><input class="pb1" type="number" min="30" max="220" value="${p.b1||""}" placeholder="γενικό" style="width:68px"><span class="mu">–</span><input class="pb2" type="number" min="30" max="220" value="${p.b2||""}" placeholder="γενικό" style="width:68px"><select class="px">${opt(MXO,p.mx||"auto")}</select><select class="pcv" title="Καμπύλη μίξης">${opt(CVO,p.cv||"auto")}</select><span class="mu pc" style="font-size:12px"></span></div></div>`).join("");tot();upd()};
  const tot=()=>{const t=readPh().reduce((a,p)=>a+p.min,0);$("wz_tot").textContent=`Σύνολο: ${t}΄ (${Math.floor(t/60)}ω ${t%60}΄)`;drawTl()};
  const drawTl=()=>{const e=$("wz_tl");if(!e)return;const rows=$$("#wz_ph .wz-ph"),P=readPh().map((p,k)=>({name:p.name,min:p.min,lt:rows[k]&&rows[k].dataset.lt||""})),st=$("wz_st")?$("wz_st").value:"";e.innerHTML=tlHTML(P,st,{drag:true});const pr=$("wz_pre");if(pr)pr.innerHTML=`<p class="mu" style="margin:0 0 4px;font-size:12px">Φανάρι βιβλιοθήκης ανά φάση: 🟢 αρκετή μουσική · 🟡 οριακά · 🔴 λίγη</p>`+tlHTML(P,st)};
  const HT=()=>{const e=$("wz_ht");return!!(e&&e.checked)};
@@ -2228,7 +2243,7 @@ function wizardModal(){const m=$("modal");m.classList.remove("hide");
    if(est.size===pool.length)stt.textContent="⚠ Καμία γνωστή ενέργεια — χρησιμοποιώ εκτίμηση από το BPM. Άφησε ενεργή την «Ανάλυση ενέργειας» για καλύτερο αποτέλεσμα.";else stt.textContent="";
    const r=planSet(pool,{phases:cfg.phases,energy:en,est,b1:cfg.b1,b2:cfg.b2,jump:cfg.jump,startKey:cfg.sk,keyStep:+cfg.ks,climbEvery:cfg.ce,mood:cfg.md,moodGap:cfg.mg,maxA:+cfg.ma,gap:+cfg.ag,rz:cfg.rz,recent:cfg.rc,ht:cfg.ht,bridge:cfg.br,brMin:cfg.bm,fixed,must});
    if(!r||!r.mix.length){stt.textContent="⚠ Δεν βρέθηκε σετ με αυτές τις ρυθμίσεις.";return}
-   const fc=cfg.fx;WZ.per=new Map();r.items.forEach(x=>{const ph=cfg.phases[x.ph],mx=ph&&MXS[ph.mx];if(mx)WZ.per.set(x.t,mx)});const anySm=[...WZ.per.values()].some(v=>v.smart);
+   const fc=cfg.fx;WZ.per=new Map();r.items.forEach(x=>{const sx=phStyle(cfg.phases[x.ph]);if(sx)WZ.per.set(x.t,sx)});const anySm=[...WZ.per.values()].some(v=>v.smart);
    if(fc.trimS||fc.trimE||fc.smart||anySm)await djPts(r.mix,{...fc,smart:fc.smart||anySm},msg=>{stt.textContent=msg},()=>WZ.skip);
    WZ.last=r;WZ.ctx={pool,en,est,jump:cfg.jump,ht:cfg.ht};WZ.st=cfg.st;mkRes(r)}
   catch(e){console.error(e);stt.textContent="⚠ Σφάλμα: "+(e&&e.message||e)}
@@ -2268,12 +2283,12 @@ const wzAlt=i=>{const r=WZ.last,C=WZ.ctx;if(!r||!C)return[];const it=r.items,x=i
   return C.pool.filter(c=>!used.has(c)&&camP(c.cam)&&C.en.has(c)).map(c=>{const e=C.en.get(c),de=Math.abs(e-x.e);if(de>1.5||(gt.length&&!gMatch(c,gt)))return null;
    for(const o of[pv&&pv.t,nx&&nx.t]){if(!o)continue;if(camMove(o.cam,c.cam).k==="clash"||bd(o.bpm,c.bpm)>jp)return null}
    return{c,e,s:(pv?mixScore(pv.t,c,true):0)+(nx?mixScore(c,nx.t,true):0)-de*8}}).filter(Boolean).sort((a,b)=>b.s-a.s).slice(0,8)};
-const wzSwap=(i,c)=>{const r=WZ.last,x=r.items[i],old=x.t;WZ.lk.tr.delete(old);x.t=c;x.e=WZ.ctx.en.get(c);x.est=WZ.ctx.est.has(c);x.br=false;planFin(r);if(WZ.per){const mx=MXS[r.marks[x.ph].p.mx];WZ.per.delete(old);if(mx)WZ.per.set(c,mx)}};
+const wzSwap=(i,c)=>{const r=WZ.last,x=r.items[i],old=x.t;WZ.lk.tr.delete(old);x.t=c;x.e=WZ.ctx.en.get(c);x.est=WZ.ctx.est.has(c);x.br=false;planFin(r);if(WZ.per){const sx=phStyle(r.marks[x.ph].p);WZ.per.delete(old);if(sx)WZ.per.set(c,sx)}};
 const wzDl=(name,text,mime)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:mime+";charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},1500)};
 const wzCsv=r=>{const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';return"\ufeff"+[["#","Έναρξη","Ώρα ρολογιού","Φάση","Καλλιτέχνης","Τίτλος","Key","BPM","Ενέργεια","Μετάβαση","Διάρκεια","Διαδρομή"].map(q).join(",")].concat(r.items.map((x,i)=>[i+1,hms(x.start),clk(WZ.st,x.start),r.marks[x.ph].p.name,x.t.artist,x.t.title||x.t.fname,padCam(x.t.cam),x.t.bpm?Math.round(x.t.bpm*10)/10:"",Math.round(x.e),i?mvLabel(x.mv)+(x.br?" · γέφυρα BPM":""):"αρχή",hms(x.t.dur||0),x.t.path||x.t.fname].map(q).join(","))).join("\n")+"\n"};
 
 /* ===== Easy wizard: ένα βήμα / μία οθόνη τη φορά ===== */
-const EZ={init:0,step:1,hours:2,st:"",tpl:"classic",src:"",ht:false,br:true,ma:true,an:true,sm:true,phases:null,skip:false,busy:false,fc:null};
+const EZ={mx:"auto",cv:"auto",init:0,step:1,hours:2,st:"",tpl:"classic",src:"",ht:false,br:true,ma:true,an:true,sm:true,phases:null,skip:false,busy:false,fc:null};
 const EZT=[
  {k:"classic",w:"2h",i:"🌙",n:"Κλασική νύχτα",d:"Ζέσταμα → ανάβαση → κορυφή → χαλάρωμα. Δουλεύει με κάθε βιβλιοθήκη."},
  {k:"two",w:"wave",i:"⛰️",n:"Δύο κορυφές",d:"Δύο κορυφώσεις με ένα διάλειμμα στη μέση."},
@@ -2292,10 +2307,10 @@ const ezScr={
  2:()=>`<h3 class="ez-h">Τι ώρα ξεκινάς; 🕙</h3><p class="mu">Έτσι θα βλέπεις το πρόγραμμα με ώρες ρολογιού (π.χ. «22:00 Warm-up · 00:20 Peak»). Είναι προαιρετικό.</p><div class="ezg">${["21:00","22:00","23:00","00:00"].map(h=>`<div class="ezt${EZ.st===h?" on":""}" data-ez="st" data-v="${h}"><b>${h}</b></div>`).join("")}<div class="ezt${EZ.st?"":" on"}" data-ez="st" data-v=""><b>Χωρίς ώρα</b></div></div><div class="rrow"><span class="mu">ή διάλεξε ώρα:</span><input type="time" id="ez_t" value="${esc(EZ.st)}"></div>`,
  3:()=>`<h3 class="ez-h">Τι ταξίδι θέλεις; 🧭</h3><p class="mu">Διάλεξε το σχήμα της βραδιάς — τα έγχρωμα μπλοκ δείχνουν τις φάσεις στη διάρκεια που διάλεξες.</p>`+EZT.map(t=>`<div class="ezt${EZ.tpl===t.k?" on":""}" data-ez="tpl" data-v="${t.k}" style="margin:8px 0"><b>${t.i} ${esc(t.n)}</b><small>${esc(t.d)}</small>${tlHTML(ezPh(t.k,EZ.hours).map(p=>({name:p.name,min:p.min})),EZ.st)}</div>`).join(""),
  4:()=>{const all=T.filter(t=>t.file),kb=all.filter(t=>camP(t.cam)&&t.bpm).length;return`<h3 class="ez-h">Από πού να πάρω μουσική; 📚</h3><p class="mu">Έχεις ${all.length} τραγούδια με αρχείο· τα ${kb} έχουν ήδη key και BPM.</p>${all.length?"":'<p style="color:var(--ac)">⚠ Δεν υπάρχουν τραγούδια με αρχείο — πρόσθεσε πρώτα τους φακέλους με τη μουσική (κουμπί 📚).</p>'}<div class="ezg" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))"><div class="ezt${EZ.src?"":" on"}" data-ez="src" data-v=""><b>📚 Όλη η βιβλιοθήκη</b><small>${all.length} τραγούδια</small></div>${PL.map(p=>`<div class="ezt${EZ.src===p.id?" on":""}" data-ez="src" data-v="${p.id}"><b>${p.smart?"✨":"🎶"} ${esc(p.name)}</b><small>${T.filter(t=>t.file&&inPL(t,p)).length} τραγούδια</small></div>`).join("")}</div>`+ezTog("an","Να αναλύσω αυτόματα ό,τι λείπει","Key, BPM και ενέργεια για τα τραγούδια που δεν τα έχουν (έως 250 ανά φορά). Μπορείς να το παραλείψεις όσο τρέχει.")},
- 5:()=>`<h3 class="ez-h">Πόσο ομαλές να είναι οι αλλαγές; 🎚</h3><p class="mu">Πάτα για να ανοίξεις ή να κλείσεις κάθε επιλογή.</p>`+ezTog("ht","Half-time / double-time BPM","Το 70 BPM (dub, reggae) θεωρείται ίσο με το 140 και το 65 με το 130 — περνάς από reggae σε house ή techno χωρίς απότομο άλμα.")+ezTog("br","Γέφυρες BPM ανάμεσα στις φάσεις","Όταν το tempo πρέπει να αλλάξει πολύ (π.χ. 100 → 128), βάζω 2–3 ενδιάμεσα κομμάτια που ανεβάζουν σταδιακά το tempo.")+ezTog("ma","Χωρίς επαναλήψεις καλλιτεχνών","Το πολύ 2 κομμάτια ανά καλλιτέχνη και όχι τον ίδιο κοντά-κοντά.")+ezTog("sm","Έξυπνες μεταβάσεις","Διαλέγω εγώ πότε και πόσο θα κρατά κάθε μίξη (λίγο πιο αργό στη δημιουργία).")+`<p class="mu" style="font-size:12px">Και πάντα μένουν τα key (Camelot) και η καμπύλη ενέργειας — δεν χρειάζεται να τα ρυθμίσεις.</p>`,
+ 5:()=>`<h3 class="ez-h">Πόσο ομαλές να είναι οι αλλαγές; 🎚</h3><p class="mu">Πάτα για να ανοίξεις ή να κλείσεις κάθε επιλογή.</p>`+ezTog("ht","Half-time / double-time BPM","Το 70 BPM (dub, reggae) θεωρείται ίσο με το 140 και το 65 με το 130 — περνάς από reggae σε house ή techno χωρίς απότομο άλμα.")+ezTog("br","Γέφυρες BPM ανάμεσα στις φάσεις","Όταν το tempo πρέπει να αλλάξει πολύ (π.χ. 100 → 128), βάζω 2–3 ενδιάμεσα κομμάτια που ανεβάζουν σταδιακά το tempo.")+ezTog("ma","Χωρίς επαναλήψεις καλλιτεχνών","Το πολύ 2 κομμάτια ανά καλλιτέχνη και όχι τον ίδιο κοντά-κοντά.")+ezTog("sm","Έξυπνες μεταβάσεις","Διαλέγω εγώ πότε και πόσο θα κρατά κάθε μίξη (λίγο πιο αργό στη δημιουργία).")+`<div style="border:1px solid var(--bd);border-radius:12px;padding:10px;margin:10px 0"><b>Τρόπος μίξης</b><p class="mu" style="margin:4px 0 8px">Για όλο το σετ — εκτός από τις φάσεις που έχουν δικό τους τρόπο (το αλλάζεις στο επόμενο βήμα).</p><div class="rrow"><span class="mu">Στυλ</span><select data-ezg="mx">${optS(MXO,EZ.mx)}</select></div><div class="rrow"><span class="mu">Καμπύλη</span><select data-ezg="cv">${optS(CVO,EZ.cv)}</select></div></div>`+`<p class="mu" style="font-size:12px">Και πάντα μένουν τα key (Camelot) και η καμπύλη ενέργειας — δεν χρειάζεται να τα ρυθμίσεις.</p>`,
  6:()=>{const P=ezP(),gl=ezGenres(),rows=P.map(ezLight),tot=P.reduce((a,p)=>a+p.min,0),miss=ezBase().filter(t=>!camP(t.cam)||!t.bpm).length;
   return`<h3 class="ez-h">Έλεγχος του προγράμματος ✅</h3><p class="mu">Σύρε τα μπλοκ για να αλλάξεις σειρά. Φανάρι ανά φάση — έχει η βιβλιοθήκη σου αρκετή μουσική; 🟢 άνετα · 🟡 οριακά · 🔴 λίγη (άλλαξε είδος ή βγάλε το όριο BPM).</p><div id="ez_tl">${tlHTML(P.map((p,i)=>({name:p.name,min:p.min,lt:rows[i].lt})),EZ.st,{drag:true})}</div><p class="mu" style="margin:0 0 6px">Σύνολο: ${Math.floor(tot/60)}ω ${tot%60}΄${miss&&EZ.an?` · ${miss} τραγούδια χωρίς key/BPM θα αναλυθούν και ίσως προστεθούν`:""}</p>`+
-  P.map((p,i)=>`<div style="border:1px solid var(--bd);border-radius:12px;padding:10px;margin:8px 0"><div class="rrow"><span style="width:12px;height:12px;border-radius:50%;background:${PHC(i)};flex:none"></span><b>${esc(p.name)}</b><span class="mu">${rows[i].lt} ${rows[i].n} τρ. · ${rows[i].mins}΄ διαθέσιμα</span><span style="margin-left:auto"><button class="sm" data-ez="pup" data-i="${i}">↑</button> <button class="sm" data-ez="pdn" data-i="${i}">↓</button></span></div><div class="rrow"><span class="mu">Διάρκεια</span><input type="number" min="5" max="600" value="${p.min}" data-ezi="pm" data-i="${i}" style="width:70px"><span class="mu">΄ · Είδος</span><select data-ezi="pg" data-i="${i}"><option value="">Όλα τα είδη</option>${p.g&&!gl.includes(p.g)?`<option value="${esc(p.g)}" selected>${esc(p.g)}</option>`:""}${gl.map(g=>`<option value="${esc(g)}"${g===p.g?" selected":""}>${esc(g)}</option>`).join("")}</select>${p.b1||p.b2?`<span class="chip">${p.b1||"…"}–${p.b2||"…"} BPM</span><button class="sm" data-ez="pbf" data-i="${i}" title="Χωρίς όριο BPM">✕ όριο</button>`:""}</div></div>`).join("")},
+  P.map((p,i)=>`<div style="border:1px solid var(--bd);border-radius:12px;padding:10px;margin:8px 0"><div class="rrow"><span style="width:12px;height:12px;border-radius:50%;background:${PHC(i)};flex:none"></span><b>${esc(p.name)}</b><span class="mu">${rows[i].lt} ${rows[i].n} τρ. · ${rows[i].mins}΄ διαθέσιμα</span><span style="margin-left:auto"><button class="sm" data-ez="pup" data-i="${i}">↑</button> <button class="sm" data-ez="pdn" data-i="${i}">↓</button></span></div><div class="rrow"><span class="mu">Διάρκεια</span><input type="number" min="5" max="600" value="${p.min}" data-ezi="pm" data-i="${i}" style="width:70px"><span class="mu">΄ · Είδος</span><select data-ezi="pg" data-i="${i}"><option value="">Όλα τα είδη</option>${p.g&&!gl.includes(p.g)?`<option value="${esc(p.g)}" selected>${esc(p.g)}</option>`:""}${gl.map(g=>`<option value="${esc(g)}"${g===p.g?" selected":""}>${esc(g)}</option>`).join("")}</select><select data-ezi="mx" data-i="${i}" title="Τρόπος μίξης αυτής της φάσης">${optS(MXO,p.mx||"auto")}</select><select data-ezi="cv" data-i="${i}" title="Καμπύλη μίξης αυτής της φάσης">${optS(CVO,p.cv||"auto")}</select>${p.b1||p.b2?`<span class="chip">${p.b1||"…"}–${p.b2||"…"} BPM</span><button class="sm" data-ez="pbf" data-i="${i}" title="Χωρίς όριο BPM">✕ όριο</button>`:""}</div></div>`).join("")},
  7:()=>{const P=ezP(),tot=P.reduce((a,p)=>a+p.min,0),t=EZT.find(x=>x.k===EZ.tpl)||EZT[0],pl=EZ.src&&PL.find(x=>x.id===EZ.src),op=[EZ.ht&&"½×/2× BPM",EZ.br&&"γέφυρες BPM",EZ.ma&&"χωρίς επαναλήψεις καλλιτεχνών",EZ.sm&&"έξυπνες μεταβάσεις"].filter(Boolean).join(" · ");
   return`<h3 class="ez-h">Όλα έτοιμα! 🎶</h3><p class="mu">Έτσι θα στήσω το σετ σου:</p><div style="line-height:1.9">⏱ <b>${Math.floor(tot/60)}ω ${tot%60}΄</b>${EZ.st?` · ξεκινά ${esc(EZ.st)}, τελειώνει ${clk(EZ.st,tot*60)}`:""}<br>${t.i} <b>${esc(t.n)}</b> · ${P.length} φάσεις<br>📚 ${pl?esc(pl.name):"Όλη η βιβλιοθήκη"}<br>🎚 ${op||"χωρίς πρόσθετες επιλογές"}</div><div class="mt" style="margin-top:18px"><button class="big" id="ez_go" data-ez="go" style="padding:14px 30px;font-size:18px">✨ Φτιάξε το σετ</button><button class="sm hide" id="ez_skip" data-ez="skip">⏭ Παράλειψη ανάλυσης</button></div><p id="ez_st" class="mu"></p>`},
  8:()=>{const r=WZ.last;if(!r)return ezScr[7]();const lk=WZ.lk,st=WZ.st,nb=r.items.filter(x=>x.br).length;
@@ -2323,7 +2338,7 @@ async function ezGenerate(o={}){const P=ezP().map(p=>({...p})),st=x=>{const e=do
   const r=planSet(pool,{phases:P,energy:en,est,b1,b2,jump:6,startKey:"",keyStep:1.5,climbEvery:12,mood:false,moodGap:6,maxA:EZ.ma?2:0,gap:EZ.ma?5:0,rz:4,recent:true,ht,bridge:EZ.br,brMin:14,fixed,must});
   if(!r||!r.mix.length){st("⚠ Δεν βρέθηκε σετ με αυτές τις ρυθμίσεις.");return null}
   const fc={fout:6,fin:4,ov:true,trimS:false,trimE:false,smart:EZ.sm,thr:-50};EZ.fc=fc;WZ.per=new Map();
-  r.items.forEach(x=>{const ph=P[x.ph],mx=ph&&MXS[ph.mx];if(mx)WZ.per.set(x.t,{...mx,smart:mx.smart&&EZ.sm})});
+  r.items.forEach(x=>{const sx=phStyle(P[x.ph],EZ.mx,EZ.cv);if(sx){if("smart" in sx)sx.smart=sx.smart&&EZ.sm;WZ.per.set(x.t,sx)}});
   if(EZ.sm)await djPts(r.mix,fc,msg=>st(msg),()=>EZ.skip);
   WZ.last=r;WZ.ctx={pool,en,est,jump:6,ht};WZ.st=EZ.st;st("");return r}
  catch(e){console.error(e);st("⚠ Σφάλμα: "+(e&&e.message||e));return null}
@@ -2340,7 +2355,9 @@ function easyModal(){const m=$("modal");m.classList.remove("hide");
   if(t.id==="ez_h"){EZ.hours=Math.max(.5,Math.min(24,+t.value||2));EZ.phases=null;ezDraw()}
   else if(t.id==="ez_t"){EZ.st=t.value;ezDraw()}
   else if(t.dataset&&t.dataset.ezi==="pm"){ezP()[+t.dataset.i].min=Math.max(1,+t.value||1);ezDraw()}
-  else if(t.dataset&&t.dataset.ezi==="pg"){ezP()[+t.dataset.i].g=t.value;ezDraw()}};
+  else if(t.dataset&&t.dataset.ezi==="pg"){ezP()[+t.dataset.i].g=t.value;ezDraw()}
+   else if(t.dataset&&(t.dataset.ezi==="mx"||t.dataset.ezi==="cv")){ezP()[+t.dataset.i][t.dataset.ezi]=t.value}
+   else if(t.dataset&&t.dataset.ezg){EZ[t.dataset.ezg]=t.value}};
  m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const b=e.target.closest("[data-ez]");if(!b||!document.getElementById("ez_root"))return;const a=b.dataset.ez,v=b.dataset.v;
   if(a==="skip"){EZ.skip=true;return}
   if(EZ.busy)return;
@@ -2775,7 +2792,13 @@ const HELP=[
 <li><b>Επικάλυψη</b> — Αν είναι ενεργή, το επόμενο ξεκινά <i>όταν αρχίζει</i> το fade out του προηγούμενου, οπότε ακούγονται μαζί (crossfade). Αν όχι, το ένα τελειώνει και μετά ξεκινά το άλλο.</li>
 <li><b>Αφαίρεση σιωπής</b> στην αρχή / στο τέλος — Κόβει τα κενά που έχουν πολλά αρχεία. Το <b>Όριο σιωπής</b> (−60/−50/−40 dB) ορίζει πόσο χαμηλός ήχος θεωρείται «σιωπή» (το −40 κόβει πιο επιθετικά).</li>
 <li><b>🧠 Έξυπνα σημεία μίξης</b> — Το πρόγραμμα διαλέγει μόνο του πότε θα γίνει η μετάβαση (από το outro στο intro, πάνω στο beat) και πόσο θα κρατήσει, ανάλογα με το πόσο ταιριάζουν τα δύο κομμάτια. Θέλει μια πρώτη ανάλυση.</li>
+<li><b>Τρόπος μίξης (έτοιμες ρυθμίσεις)</b> — Με ένα κλικ γεμίζει τα παραπάνω: <b>Μακρύ blend 16΄΄</b> (chill / deep), <b>Smooth crossfade 8΄΄</b>, <b>Tight beatmix 4΄΄</b> (house / techno), <b>Γρήγορο cut 1΄΄</b> (rock / dub) και <b>Fade out → fade in χωρίς επικάλυψη</b> (γέφυρα). Αν αλλάξεις κάποιο πεδίο, επιστρέφει σε «Χειροκίνητα». Βρίσκεται σε όλες τις καρτέλες του Dj mode· στον Εύκολο οδηγό και στο Set wizard μπορείς να ορίσεις διαφορετικό τρόπο <b>ανά φάση</b> (π.χ. blend στο warm-up, tight στο peak, cut στο rock) — ιδανικό για πολύωρα προγράμματα.</li>
+<li><b>Καμπύλη μίξης</b> — <b>Ισχύος (equal-power)</b>: το τραγούδι που φεύγει και αυτό που έρχεται κρατούν σταθερή «αίσθηση έντασης» (προεπιλογή, ταιριάζει σχεδόν παντού). <b>Γραμμική (linear)</b>: τα δύο fade είναι ευθείες γραμμές που αθροίζονται σε σταθερό επίπεδο — καλύτερη όταν τα κομμάτια είναι beatmatched και ίδιου key, γιατί δεν «φουσκώνει» η ένταση στη μέση. Ορίζεται και ανά φάση.</li>
 </ul>
+<h4>✂ Χειροκίνητα σημεία fade ανά τραγούδι (δεξί κλικ)</h4>
+<p>Κάνε <b>δεξί κλικ</b> σε ένα τραγούδι → <b>✂ Σημεία fade in / fade out…</b>. Ανοίγει παράθυρο με την κυματομορφή και τέσσερις δείκτες που σέρνεις (ή γράφεις τιμές):</p>
+<ul><li><b>Αρχή fade in</b> — από πού ξεκινά το τραγούδι όταν «μπαίνει» (ό,τι είναι πριν παραλείπεται, π.χ. μια μεγάλη σιωπή).</li><li><b>Τέλος fade in</b> — εδώ φτάνει σε πλήρη ένταση. Η απόσταση από την αρχή είναι η διάρκεια του fade in.</li><li><b>Αρχή fade out</b> — εδώ αρχίζει να χαμηλώνει <i>και μπαίνει το επόμενο τραγούδι</i> (επικάλυψη).</li><li><b>Τέλος (σιγή)</b> — εδώ σταματά εντελώς. Η απόσταση από το «Αρχή fade out» είναι η διάρκεια του fade out/επικάλυψης.</li><li><b>Καμπύλη fade</b> — Ισχύος ή γραμμική μόνο για αυτό το τραγούδι (αλλιώς ισχύει η γενική ρύθμιση). Η ακρόαση χρησιμοποιεί την ίδια καμπύλη.</li></ul>
+<p>Με το <b>▶ Ακρόαση</b> ακούς το τραγούδι με τα fade που όρισες, και με το <b>⇤ εδώ</b> βάζεις έναν δείκτη στη θέση που ακούς. <b>🧠 Αυτόματα σημεία</b> προτείνει τιμές από την ανάλυση σιωπής. Τα χειροκίνητα σημεία ισχύουν σε κάθε αναπαραγωγή (και σε όλες τις καρτέλες Dj mode) και αντικαθιστούν τις γενικές ρυθμίσεις για αυτό το τραγούδι· αποθηκεύονται μαζί με τη βιβλιοθήκη.</p>
 <div class="hl-tip">Με ενεργό <b>Audiophile mode</b> οι μεταβάσεις είναι απενεργοποιημένες.</div>`},
 
 {id:"easy",i:"✨",t:"Dj mode → ✨ Εύκολος οδηγός",h:`
@@ -2913,6 +2936,71 @@ function helpModal(id){const m=$("modal");m.classList.remove("hide");
  m.onclick=e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const s=e.target.closest("[data-s]");if(s)go(s.dataset.s)};
  if(id)setTimeout(()=>go(id),50)}
 Object.assign(EXACT,{"❓ Οδηγός χρήσης":"❓ User guide"});
+
+/* ===== Per-track fade points: right-click a track → ✂ Σημεία fade in / fade out ===== */
+let CTX=null;
+const ctxClose=()=>{if(CTX){CTX.remove();CTX=null}};
+document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#ctxm{position:fixed;z-index:3000;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px;box-shadow:0 8px 28px #0009;min-width:240px}#ctxm button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--tx);padding:8px 12px;border-radius:7px;cursor:pointer;font:inherit}#ctxm button:hover:not(:disabled){background:var(--sel)}#ctxm button:disabled{opacity:.4;cursor:default}.mxc{width:100%;height:170px;display:block;background:var(--bg);border:1px solid var(--bd);border-radius:10px;touch-action:none;cursor:crosshair}.mxg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}.mxg label{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:6px 8px}.mxg input{width:74px}.mxg i{width:10px;height:10px;border-radius:50%;flex:none}.mxg .mu{flex:1;font-size:12px}@media(max-width:620px){.mxg{grid-template-columns:1fr}}"}));
+document.addEventListener("click",ctxClose);document.addEventListener("scroll",()=>{if(CTX&&performance.now()-CTX.__t>250)ctxClose()},true);window.addEventListener("blur",ctxClose);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")ctxClose()});
+document.addEventListener("contextmenu",e=>{const row=e.target.closest&&e.target.closest("#content [data-i]");if(!row)return;const t=T[+row.dataset.i];if(!t)return;e.preventDefault();ctxClose();
+ const d=document.createElement("div");d.id="ctxm";
+ const items=[["play","▶ Αναπαραγωγή",!!t.file],["mix","✂ Σημεία fade in / fade out…"+(t.mix?"  ✓":""),!!t.file],["pl","🎶 Προσθήκη στη playlist…",true],["ed","✏️ Επεξεργασία στοιχείων…",true]];
+ d.innerHTML=items.map(([k,l,ok])=>`<button data-k="${k}"${ok?"":" disabled"}>${l}</button>`).join("");document.body.appendChild(d);
+ d.style.left=Math.max(4,Math.min(e.clientX,innerWidth-d.offsetWidth-6))+"px";d.style.top=Math.max(4,Math.min(e.clientY,innerHeight-d.offsetHeight-6))+"px";
+ d.onclick=ev=>{const b=ev.target.closest("button");if(!b||b.disabled)return;ev.stopPropagation();ctxClose();({play:()=>startQ(lastL,t),mix:()=>mixEditor(t),pl:()=>pickPL([t]),ed:()=>editTrack(t)})[b.dataset.k]()};CTX=d;d.__t=performance.now()});
+const mxT=s=>{s=Math.max(0,s||0);const m=Math.floor(s/60);return m+":"+(s-m*60).toFixed(1).padStart(4,"0")};
+async function mixEditor(t){const m=$("modal");m.classList.remove("hide");
+ m.innerHTML=`<div class="mc" style="max-width:880px"><div class="mh"><h2>✂ Σημεία fade — ${esc(t.title||t.fname)}</h2><button class="x">×</button></div><p class="mu">⏳ Φόρτωση κυματομορφής…</p></div>`;
+ let d,sr;try{({d,sr}=await decodeMono(t.file,8000))}catch(e){m.querySelector(".mu").textContent="Δεν ήταν δυνατή η ανάγνωση του αρχείου.";return}
+ const dur=d.length/sr,W=1600,pk=new Float32Array(W);for(let x=0;x<W;x++){let a=0;const s=Math.floor(x/W*d.length),e=Math.max(s+1,Math.floor((x+1)/W*d.length));for(let i=s;i<e;i++){const v=d[i]<0?-d[i]:d[i];if(v>a)a=v}pk[x]=a}
+ let mx=0;for(let x=0;x<W;x++)if(pk[x]>mx)mx=pk[x];mx=mx||1;
+ const K=[["i0","Αρχή fade in","#3fb950","Από πού ξεκινά το τραγούδι όταν μπαίνει (ό,τι είναι πριν παραλείπεται)"],["i1","Τέλος fade in","#8ddb8c","Εδώ φτάνει σε πλήρη ένταση"],["o0","Αρχή fade out","#f0883e","Εδώ αρχίζει να χαμηλώνει και μπαίνει το επόμενο τραγούδι"],["o1","Τέλος (σιγή)","#f85149","Εδώ το τραγούδι σταματά εντελώς"]];
+ const P=t.mix?{i0:+t.mix.i0||0,i1:+t.mix.i1||0,o0:+t.mix.o0||dur,o1:+t.mix.o1||dur,cv:t.mix.cv||"auto"}:{i0:0,i1:0,o0:dur,o1:dur,cv:"auto"};const curCv=()=>P.cv==="lin"||P.cv==="eq"?P.cv:fxLoad().cv;
+ const ord=["i0","i1","o0","o1"],norm=k=>{const j=ord.indexOf(k);P[k]=Math.max(0,Math.min(dur,P[k]));for(let q=j+1;q<4;q++)if(P[ord[q]]<P[ord[q-1]])P[ord[q]]=P[ord[q-1]];for(let q=j-1;q>=0;q--)if(P[ord[q]]>P[ord[q+1]])P[ord[q]]=P[ord[q+1]]};
+ m.innerHTML=`<div class="mc" id="mx_c" style="max-width:880px"><div class="mh"><h2>✂ Σημεία fade — ${esc(t.title||t.fname)}</h2><button class="x">×</button></div>
+ <p class="mu" style="margin:4px 0 8px">Σύρε τους δείκτες πάνω στην κυματομορφή (ή γράψε τιμές). Το <b>επόμενο τραγούδι μπαίνει από το «Αρχή fade out»</b> και η ένταση του τραγουδιού χαμηλώνει μέχρι το «Τέλος». Πάτα στην κυματομορφή για να μετακινήσεις την ακρόαση.</p>
+ <canvas id="mx_cv" class="mxc"></canvas>
+ <div class="mr"><span class="ell" id="mx_tm">0:00.0 / ${mxT(dur)}</span><button class="sm" id="mx_pl">▶ Ακρόαση</button><button class="sm" id="mx_pi" title="Ακρόαση από λίγο πριν το fade in">⏮ Αρχή</button><button class="sm" id="mx_po" title="Ακρόαση 8 δευτερόλεπτα πριν το fade out">⏭ Μετάβαση</button></div>
+ <div class="mxg">${K.map(([k,l,c,h])=>`<label title="${h}"><i style="background:${c}"></i><span class="mu">${l}</span><input type="number" min="0" max="${dur.toFixed(1)}" step="0.1" data-k="${k}"><button class="sm" data-set="${k}" title="Βάλε τη θέση της ακρόασης">⇤ εδώ</button></label>`).join("")}</div>
+ <label class="rrow" style="margin:0 0 6px"><span class="mu">Καμπύλη fade (μόνο για αυτό το τραγούδι)</span><select id="mx_cv">${optS([["auto","Γενική (από τις Μεταβάσεις)"],["eq","Ισχύος (equal-power)"],["lin","Γραμμική (linear)"]],P.cv)}</select></label>
+ <p class="mu" id="mx_i" style="font-size:12px;margin:0 0 8px"></p>
+ <div class="mt"><button class="big" id="mx_sv" style="padding:9px 20px">💾 Αποθήκευση</button><button class="sm" id="mx_au">🧠 Αυτόματα σημεία</button><button class="sm" id="mx_cl">↺ Καθαρισμός</button><button class="sm" id="mx_cn">Άκυρο</button></div></div>`;
+ const cv=$("mx_cv"),ctx=cv.getContext("2d"),url=t.file.native?t.file.url:URL.createObjectURL(t.file),a=new Audio();a.__r=1;a.preload="auto";a.src=url;
+ const wasPlaying=!au.paused&&!!cur;let playing=false,alive=true;
+ const gain=tm=>tm<P.i0?0:tm<P.i1?fcv((tm-P.i0)/(P.i1-P.i0),curCv()):tm<P.o0?1:(P.o1>=dur-.05&&P.o0>=dur-.05)?1:tm<P.o1?fcv((P.o1-tm)/(P.o1-P.o0),curCv()):0;
+ const draw=()=>{const w=cv.clientWidth,h=cv.clientHeight,r=devicePixelRatio||1;if(cv.width!==Math.round(w*r)){cv.width=Math.round(w*r);cv.height=Math.round(h*r)}ctx.setTransform(r,0,0,r,0,0);ctx.clearRect(0,0,w,h);
+  const X=s=>s/dur*w,cs=getComputedStyle(document.documentElement),mu=cs.getPropertyValue("--mu")||"#999",ac=cs.getPropertyValue("--ac")||"#fb923c";
+  ctx.fillStyle=mu;ctx.globalAlpha=.55;for(let x=0;x<w;x++){const v=pk[Math.min(W-1,Math.floor(x/w*W))]/mx,hh=Math.max(1,v*h*.9);ctx.fillRect(x,(h-hh)/2,1,hh)}ctx.globalAlpha=1;
+  ctx.fillStyle="rgba(0,0,0,.45)";ctx.fillRect(0,0,X(P.i0),h);if(P.o1<dur-.05)ctx.fillRect(X(P.o1),0,w-X(P.o1),h);
+  ctx.strokeStyle=ac;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(X(P.i0),h-3);ctx.lineTo(X(P.i1),4);ctx.lineTo(X(P.o0),4);ctx.lineTo(X(P.o1),h-3);ctx.stroke();
+  K.forEach(([k,l,c])=>{const x=Math.round(X(P[k]))+.5;ctx.strokeStyle=c;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();ctx.fillStyle=c;ctx.fillRect(x-5,0,10,10)});
+  const px=X(a.currentTime||0);ctx.strokeStyle="#fff";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,h);ctx.stroke()};
+ const sync=()=>{m.querySelectorAll("input[data-k]").forEach(i=>{if(document.activeElement!==i)i.value=P[i.dataset.k].toFixed(1)});
+  const fi=P.i1-P.i0,fo=P.o1-P.o0;$("mx_i").textContent=`Fade in: ${fi>.05?fi.toFixed(1)+" δευτ.":"χωρίς (άμεση είσοδος)"} · Fade out / επικάλυψη: ${P.o0>=dur-.05?"αυτόματα (γενικές ρυθμίσεις)":fo>.05?fo.toFixed(1)+" δευτ.":"κοφτό (χωρίς επικάλυψη)"}`+(t.pts?"":" · Tip: πάτα «Αυτόματα σημεία» για να προτείνει το πρόγραμμα αρχή/τέλος.");draw()};
+ const tick=setInterval(()=>{if(!alive)return;if(m.classList.contains("hide")||!$("mx_c")){end();return}
+  const tm=a.currentTime||0;$("mx_tm").textContent=mxT(tm)+" / "+mxT(dur);if(playing){a.volume=Math.max(0,Math.min(1,gain(tm)));if(P.o1<dur-.05&&tm>=P.o1+.2){a.pause();playing=false;$("mx_pl").textContent="▶ Ακρόαση"}}draw()},40);
+ function end(){if(!alive)return;alive=false;clearInterval(tick);try{a.pause()}catch(e){}a.removeAttribute("src");try{a.load()}catch(e){}if(!t.file.native)URL.revokeObjectURL(url);if(wasPlaying&&au.paused)au.play().catch(()=>{})}
+ const play=(from)=>{if(!au.paused)au.pause();if(from!=null)try{a.currentTime=Math.max(0,from)}catch(e){}a.volume=Math.max(0,gain(a.currentTime||0));a.play().then(()=>{playing=true;$("mx_pl").textContent="⏸ Παύση"}).catch(()=>{})};
+ const pause=()=>{a.pause();playing=false;$("mx_pl").textContent="▶ Ακρόαση"};
+ let drag=null;const pos=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,w:r.width}};
+ cv.onpointerdown=e=>{const{x,w}=pos(e);let best=null,bd=11;K.forEach(([k])=>{const dd=Math.abs(P[k]/dur*w-x);if(dd<bd){bd=dd;best=k}});if(best){drag=best;cv.setPointerCapture(e.pointerId)}else{try{a.currentTime=x/w*dur}catch(er){};draw()}};
+ cv.onpointermove=e=>{if(!drag)return;const{x,w}=pos(e);P[drag]=x/w*dur;norm(drag);sync()};
+ cv.onpointerup=cv.onpointercancel=()=>{drag=null};
+ m.onchange=e=>{if(e.target.id==="mx_cv")P.cv=e.target.value};
+ m.oninput=e=>{const i=e.target.closest&&e.target.closest("input[data-k]");if(i&&i.value!==""){P[i.dataset.k]=+i.value;norm(i.dataset.k);sync()}};
+ m.onclick=e=>{if(e.target===m||e.target.className==="x"||e.target.id==="mx_cn"){end();m.classList.add("hide");return}
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.set){P[b.dataset.set]=a.currentTime||0;norm(b.dataset.set);sync()}
+  else if(b.id==="mx_pl"){playing?pause():play()}
+  else if(b.id==="mx_pi"){play(Math.max(0,P.i0-1))}
+  else if(b.id==="mx_po"){play(Math.max(0,P.o0-8))}
+  else if(b.id==="mx_cl"){P.i0=0;P.i1=0;P.o0=dur;P.o1=dur;P.cv="auto";$("mx_cv").value="auto";sync()}
+  else if(b.id==="mx_au"){b.disabled=true;b.textContent="⏳ Ανάλυση…";analyzePoints(t,-50).then(p=>{b.disabled=false;b.textContent="🧠 Αυτόματα σημεία";if(!p){toast("Δεν βρέθηκαν αυτόματα σημεία");return}
+    P.i0=Math.min(p.s,dur);P.i1=Math.min(dur,P.i0+4);P.o1=Math.min(dur,p.e);P.o0=Math.max(P.i1+1,Math.min(p.o&&p.o<p.e?p.o:p.e-6,P.o1));norm("o0");sync()})}
+  else if(b.id==="mx_sv"){const r2=x=>Math.round(x*100)/100;if(P.i0<.05&&P.i1<.05&&P.o0>=dur-.05&&P.cv==="auto")delete t.mix;else{t.mix={i0:r2(P.i0),i1:r2(P.i1),o0:r2(P.o0),o1:r2(P.o1)};if(P.cv!=="auto")t.mix.cv=P.cv}idbDirty=true;try{markDirty()}catch(er){}end();m.classList.add("hide");toast(t.mix?"Αποθηκεύτηκαν τα σημεία fade":"Τα σημεία fade καθαρίστηκαν")}};
+ sync();new ResizeObserver(draw).observe(cv)}
+Object.assign(EXACT,{"✂ Σημεία fade in / fade out…":"✂ Fade in / fade out points…","▶ Αναπαραγωγή":"▶ Play","🎶 Προσθήκη στη playlist…":"🎶 Add to playlist…","✏️ Επεξεργασία στοιχείων…":"✏️ Edit details…","Αρχή fade in":"Fade-in start","Τέλος fade in":"Fade-in end","Αρχή fade out":"Fade-out start","Τέλος (σιγή)":"End (silence)","💾 Αποθήκευση":"💾 Save","🧠 Αυτόματα σημεία":"🧠 Auto points","↺ Καθαρισμός":"↺ Clear","⏳ Φόρτωση κυματομορφής…":"⏳ Loading waveform…"});
 </script><script type="text/plain" id="lamesrc">function lamejs(){function X(c){return new Int32Array(c)}function K(c){return new Float32Array(c)}function ca(c){if(1==c.length)return K(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(ca(c));return n}function Ia(c){if(1==c.length)return X(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(Ia(c));return n}function dc(c){if(1==c.length)return new Int16Array(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(dc(c));return n}function Ob(c){if(1==c.length)return Array(c[0]);
 var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(Ob(c));return n}function ra(c){this.ordinal=c}function G(c){this.ordinal=c}function la(c){this.ordinal=function(){return c}}function mc(){this.getLameVersion=function(){return"3.98.4"};this.getLameShortVersion=function(){return"3.98.4"};this.getLameVeryShortVersion=function(){return"LAME3.98r"};this.getPsyVersion=function(){return"0.93"};this.getLameUrl=function(){return"http://www.mp3dev.org/"};this.getLameOsBitness=function(){return"32bits"}}
 function Y(){function c(f,b,c,a,m,k){for(;0!=m--;)c[a]=1E-10+f[b+0]*k[0]-c[a-1]*k[1]+f[b-1]*k[2]-c[a-2]*k[3]+f[b-2]*k[4]-c[a-3]*k[5]+f[b-3]*k[6]-c[a-4]*k[7]+f[b-4]*k[8]-c[a-5]*k[9]+f[b-5]*k[10]-c[a-6]*k[11]+f[b-6]*k[12]-c[a-7]*k[13]+f[b-7]*k[14]-c[a-8]*k[15]+f[b-8]*k[16]-c[a-9]*k[17]+f[b-9]*k[18]-c[a-10]*k[19]+f[b-10]*k[20],++a,++b}function k(f,b,c,a,m,k){for(;0!=m--;)c[a]=f[b+0]*k[0]-c[a-1]*k[1]+f[b-1]*k[2]-c[a-2]*k[3]+f[b-2]*k[4],++a,++b}function n(f){return f*f}var V=Y.RMS_WINDOW_TIME_NUMERATOR,
