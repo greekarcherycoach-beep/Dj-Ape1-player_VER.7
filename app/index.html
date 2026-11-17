@@ -2082,8 +2082,7 @@ function energyFeatures(d,sr){const n=d.length,len=Math.min(n,sr*120),st=Math.fl
  return{f:[drum,bass,busy,emo].map(v=>Math.round(v*1000)/1000),raw:.3*drum+.25*bass+.25*busy+.2*emo}}
 async function analyzeEnergy(t){if(!t||!t.file)return null;try{const{d,sr}=await decodeMono(t.file,22050),r=energyFeatures(d,sr);if(!r)return null;t.efeat=r.f;t.eraw=Math.round(r.raw*1000)/1000;t.esrc="auto";return r}catch(e){return null}}
 /* the same yardstick for every track: automatic energies are ranked inside YOUR library (1..10) */
-function energyRecalc(){const A=T.filter(t=>t.esrc==="auto"&&t.eraw>0);if(!A.length)return;const so=A.map(t=>t.eraw).sort((a,b)=>a-b);
- A.forEach(t=>{let e;if(A.length>=12){let lo=0,hi=so.length;while(lo<hi){const mi=(lo+hi)>>1;if(so[mi]<t.eraw)lo=mi+1;else hi=mi}e=1+9*lo/Math.max(1,so.length-1)}else e=1+9*Math.min(1,t.eraw*1.15);t.energy=Math.max(1,Math.min(10,Math.round(e)))});idbDirty=true}
+/* energyRecalc: see the genre-aware version further below */
 
 /* --- the planner: walks the energy curve phase by phase, choosing keys with the moves of the guide --- */
 function planSet(pool,cfg){const rnd=cfg.rand||Math.random,now=Date.now(),ph=(cfg.phases||[]).filter(p=>p.min>0);if(!ph.length)return null;
@@ -2371,8 +2370,8 @@ function easyModal(){const m=$("modal");m.classList.remove("hide");
  ezDraw()}
 
 /* ===== Dj mode: one entry point, five tabs ===== */
-let djTab="am";const DJT=[["ez","✨ Εύκολος οδηγός"],["am","🎛 Automix"],["sm","🧠 Smart Mix"],["wz","🧭 Wizard σετ"],["sg","🔮 Επόμενο τραγούδι"],["pl","🎶 Playlists"]];
-function djModal(tab,arg){djTab=tab||djTab;({ez:()=>easyModal(),am:()=>automixModal(),sm:()=>smartMixModal(arg),wz:()=>wizardModal(),sg:()=>sugModal(),pl:()=>plModal(arg)})[djTab]()}
+let djTab="am";const DJT=[["ez","✨ Εύκολος οδηγός"],["am","🎛 Automix"],["sm","🧠 Smart Mix"],["wz","🧭 Wizard σετ"],["en","⚡ Ενέργεια"],["sg","🔮 Επόμενο τραγούδι"],["pl","🎶 Playlists"]];
+function djModal(tab,arg){djTab=tab||djTab;({ez:()=>easyModal(),am:()=>automixModal(),sm:()=>smartMixModal(arg),wz:()=>wizardModal(),en:()=>energyModal(),sg:()=>sugModal(),pl:()=>plModal(arg)})[djTab]()}
 function djAddTabs(act){djTab=act;const m=$("modal"),mc=m.querySelector(".mc");if(!mc||m.classList.contains("hide"))return;mc.classList.add("dj");const h=mc.querySelector(".mh");if(!h)return;
  const bar=document.createElement("div");bar.className="mt dj-tabs";bar.innerHTML=DJT.map(([k,l])=>`<button class="sm ${k===act?"on":""}" data-dj="${k}">${l}</button>`).join("");h.insertAdjacentElement("afterend",bar);
  bar.querySelectorAll("button").forEach(b=>b.onclick=e=>{e.stopPropagation();djModal(b.dataset.dj)})}
@@ -2564,6 +2563,84 @@ Object.assign(EXACT,{"Εγγραφή (MP3 320 / FLAC)":"Record (MP3 320 / FLAC)"
 "⚠ Δεν ανιχνεύεται ήχος στην εγγραφή — αν ακούς μουσική, το αρχείο προέρχεται από άλλη πηγή που δεν μπορεί να καταγραφεί":"⚠ No audio detected in the recording — if you hear music, the file comes from a source that cannot be captured"});
 PAT.push([/^⏺ Η εγγραφή ξεκίνησε: ([\s\S]*)$/,"⏺ Recording started: $1"],[/^✅ Η εγγραφή αποθηκεύτηκε: ([\s\S]*)$/,"✅ Recording saved: $1"],[/^⚠ Σφάλμα αποθήκευσης εγγραφής: ([\s\S]*)$/,"⚠ Error saving the recording: $1"]);
 
+
+/* ===== Energy analysis by genre + wizard with review before saving ===== */
+let ENS={mode:"genre",scope:"new",prot:0};try{Object.assign(ENS,JSON.parse(localStorage.getItem("mlen")||"{}"))}catch(e){}
+const saveENS=()=>{try{localStorage.setItem("mlen",JSON.stringify(ENS))}catch(e){}};
+const EW={items:[],stage:"setup",stop:false,fold:new Set(),gen:new Set(),filter:"",sort:"grp",lim:200,run:false};
+const ENMODES=[["genre","Ίδιο είδος (πρώτο είδος του τραγουδιού)"],["folder","Ίδιος φάκελος"],["all","Όλη η βιβλιοθήκη"]];
+const enGroupKey=(t,mode)=>mode==="all"?"":mode==="folder"?(t.folder||""):lowS((t.genres&&t.genres[0])||"");
+const enGroupLbl=(t,mode)=>mode==="all"?"Όλη η βιβλιοθήκη":mode==="folder"?(t.folder||"(ρίζα)"):((t.genres&&t.genres[0])||"Χωρίς είδος");
+/* rank raw scores 1..10 INSIDE each group; groups with fewer than 8 tracks fall back to the whole pool */
+function energyRank(items,mode){mode=mode||ENS.mode;const MIN=8,out=new Map(),grp=new Map();
+ items.forEach(x=>{const k=enGroupKey(x.t,mode);(grp.get(k)||grp.set(k,[]).get(k)).push(x)});
+ const allS=items.map(x=>x.raw).sort((a,b)=>a-b);
+ const sc=(so,raw)=>{if(so.length<MIN)return 1+9*Math.min(1,raw*1.15);let lo=0,hi=so.length;while(lo<hi){const mi=(lo+hi)>>1;if(so[mi]<raw)lo=mi+1;else hi=mi}return 1+9*lo/Math.max(1,so.length-1)};
+ grp.forEach(a=>{const own=a.length>=MIN||mode==="all",so=own?a.map(x=>x.raw).sort((p,q)=>p-q):allS;
+  a.forEach(x=>out.set(x.t,{e:Math.max(1,Math.min(10,Math.round(sc(so,x.raw)))),g:own?enGroupLbl(x.t,mode):"Λίγα τραγούδια — σύγκριση με όλη τη βιβλιοθήκη",fb:!own,n:a.length}))});
+ return out}
+function energyRecalc(){const A=T.filter(t=>t.esrc==="auto"&&t.eraw>0);if(!A.length)return;const r=energyRank(A.map(t=>({t,raw:t.eraw})));A.forEach(t=>{const o=r.get(t);t.energy=o.e;t.egrp=o.g});idbDirty=true}
+/* raw measurement without touching the track (so nothing is stored until the user saves) */
+async function energyRaw(t){if(t.eraw>0&&t.efeat)return{raw:t.eraw,f:t.efeat};try{const{d,sr}=await decodeMono(t.file,22050),r=energyFeatures(d,sr);return r?{raw:Math.round(r.raw*1000)/1000,f:r.f}:null}catch(e){return null}}
+const enProt=t=>t.esrc==="manual"||t.esrc==="tag"||tagEnergy(t)>0;
+function enPick(){return T.filter(t=>{if(!t.file||t.temp)return false;if(EW.fold.size&&!EW.fold.has(t.folder||""))return false;if(EW.gen.size&&!(t.genres||[]).some(g=>EW.gen.has(g)))return false;
+ if(enProt(t)&&!ENS.prot)return false;const has=t.energy>=1&&t.energy<=10;if(ENS.scope==="new")return!has;if(ENS.scope==="auto")return!has||t.esrc==="auto";return true})}
+function enRerank(){const ids=new Set(EW.items.map(x=>x.t)),pool=EW.items.map(x=>({t:x.t,raw:x.raw}));T.forEach(t=>{if(!ids.has(t)&&t.esrc==="auto"&&t.eraw>0)pool.push({t,raw:t.eraw})});
+ const r=energyRank(pool);EW.items.forEach(x=>{const o=r.get(x.t);x.g=o.g;x.fb=o.fb;if(!x.edited)x.e=o.e;x.auto=o.e})}
+function energyModal(){const m=$("modal");m.classList.remove("hide");
+ if(EW.stage==="review"&&EW.items.length)return enReview(m);
+ EW.stage="setup";const real=T.filter(t=>t.file&&!t.temp),fc=new Map(),gc=new Map();
+ real.forEach(t=>{const f=t.folder||"";fc.set(f,(fc.get(f)||0)+1);(t.genres||[]).forEach(g=>gc.set(g,(gc.get(g)||0)+1))});
+ const fl=[...fc].sort((a,b)=>a[0].localeCompare(b[0],"el")),gl=[...gc].sort((a,b)=>b[1]-a[1]).slice(0,120);
+ const have=real.filter(t=>t.energy>=1&&t.energy<=10).length;
+ m.innerHTML=`<div class="mc" style="max-width:720px"><div class="mh"><h2>⚡ Ανάλυση ενέργειας</h2><button class="x">×</button></div>
+ <p class="mu">Αναλύει τον ήχο και βαθμολογεί 1–10, <b>συγκρίνοντας κάθε τραγούδι μόνο με όμοιά του</b> (ίδιο είδος ή φάκελο), ώστε ένα ambient να μη μπερδεύεται με ένα hard techno. Βλέπεις και διορθώνεις τα αποτελέσματα <b>πριν</b> αποθηκευτούν.</p>
+ <div class="mr"><span class="ell">Τραγούδια με αρχείο</span><b>${real.length}</b></div><div class="mr"><span class="ell">Με γνωστή ενέργεια</span><b>${have}</b></div>
+ <label class="fld"><span class="mu">Σύγκριση μέσα σε</span><select id="en_m">${ENMODES.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></label>
+ <label class="fld"><span class="mu">Ποια τραγούδια</span><select id="en_s"><option value="new">Μόνο όσα δεν έχουν ενέργεια</option><option value="auto">Όσα δεν έχουν + τα αυτόματα (επανεκτίμηση)</option><option value="all">Όλα</option></select></label>
+ <label class="mr"><input type="checkbox" id="en_p" ${ENS.prot?"checked":""}><span class="ell">Να συμπεριληφθούν και όσα έχουν tag («Energy N») ή χειροκίνητη τιμή</span></label>
+ <details class="dd" style="margin:8px 0" open><summary>📁 Φάκελοι <span class="mu">(${EW.fold.size?EW.fold.size+" επιλεγμένοι":"όλοι"})</span></summary><div style="padding:6px 0"><input id="en_ff" placeholder="Φίλτρο φακέλων…" style="width:100%;margin-bottom:6px"><div id="en_fl" style="max-height:170px;overflow:auto">${fl.map(([f,n])=>`<label class="mr" data-n="${esc(lowS(f))}"><input type="checkbox" data-f="${esc(f)}" ${EW.fold.has(f)?"checked":""}><span class="ell">${esc(f||"(ρίζα)")}</span><span class="mu">${n}</span></label>`).join("")}</div><button class="sm" id="en_fc">Καθαρισμός επιλογής</button></div></details>
+ <details class="dd" style="margin:8px 0"><summary>🎵 Είδη <span class="mu">(${EW.gen.size?EW.gen.size+" επιλεγμένα":"όλα"})</span></summary><div class="chips" style="padding:8px 0">${gl.map(([g,n])=>`<label class="chip ${EW.gen.has(g)?"on":""}"><input type="checkbox" data-g="${esc(g)}" ${EW.gen.has(g)?"checked":""} style="display:none">${esc(g)} <small>${n}</small></label>`).join("")}</div><button class="sm" id="en_gc">Καθαρισμός επιλογής</button></details>
+ <p class="mu" id="en_cnt"></p><div class="mt"><button class="big" id="en_go" style="padding:10px 22px;font-size:15px">⚡ Έναρξη ανάλυσης</button>${EW.items.length?'<button class="sm" id="en_back">↩ Επιστροφή στα αποτελέσματα</button>':""}</div></div>`;
+ $("en_m").value=ENS.mode;$("en_s").value=ENS.scope;
+ const cnt=()=>{ENS.mode=$("en_m").value;ENS.scope=$("en_s").value;ENS.prot=$("en_p").checked?1:0;saveENS();$("en_cnt").textContent="Θα αναλυθούν "+enPick().length+" τραγούδια."};cnt();
+ m.onchange=m.oninput=e=>{const x=e.target;if(x.dataset.f!==undefined){x.checked?EW.fold.add(x.dataset.f):EW.fold.delete(x.dataset.f)}else if(x.dataset.g!==undefined){x.checked?EW.gen.add(x.dataset.g):EW.gen.delete(x.dataset.g);x.parentNode.classList.toggle("on",x.checked)}
+  else if(x.id==="en_ff"){const q=lowS(x.value);m.querySelectorAll("#en_fl label").forEach(l=>l.style.display=l.dataset.n.includes(q)?"":"none")}cnt()};
+ m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const id=e.target.id;
+  if(id==="en_fc"){EW.fold.clear();energyModal()}else if(id==="en_gc"){EW.gen.clear();energyModal()}else if(id==="en_back"){EW.stage="review";energyModal()}
+  else if(id==="en_go"){cnt();const L=enPick();if(!L.length){toast("Κανένα τραγούδι για ανάλυση με αυτά τα κριτήρια");return}if(EW.items.length&&!confirm("Τα προηγούμενα αποτελέσματα που δεν αποθηκεύτηκαν θα χαθούν. Συνέχεια;"))return;enRun(L)}}}
+async function enRun(L){const m=$("modal");EW.stop=false;EW.items=[];EW.stage="run";EW.run=true;
+ m.innerHTML=`<div class="mc" style="max-width:560px"><div class="mh"><h2>⚡ Ανάλυση ενέργειας</h2><button class="x">×</button></div><p class="mu" id="en_st">Έναρξη…</p><div class="recm" style="margin:10px 0"><i id="en_pb" style="width:100%"></i></div><div class="mt"><button class="sm danger" id="en_stop">⏹ Διακοπή (προβολή όσων αναλύθηκαν)</button></div></div>`;
+ let closed=false;m.onclick=e=>{if(e.target.id==="en_stop"){EW.stop=true}else if(e.target===m||e.target.className==="x"){EW.stop=true;closed=true;m.classList.add("hide")}};
+ for(let i=0;i<L.length&&!EW.stop;i++){const t=L[i],st=$("en_st");if(st){st.textContent=`⚡ ${i+1}/${L.length} — ${t.title||t.fname}`;$("en_pb").style.width=(100-100*i/L.length)+"%"}
+  const r=await energyRaw(t);if(r)EW.items.push({t,raw:r.raw,f:r.f,old:t.energy>=1?t.energy:null,oldSrc:t.esrc||"",e:null,edited:false,g:"",auto:0});if(i%4===3)await new Promise(r=>setTimeout(r))}
+ EW.run=false;if(!EW.items.length){EW.stage="setup";if(!closed){toast("Δεν ήταν δυνατή η ανάλυση (αρχεία χωρίς πρόσβαση;)");energyModal()}return}
+ enRerank();EW.stage="review";EW.lim=200;if(!closed)energyModal()}
+function enReview(m){const IT=EW.items,q=lowS(EW.filter);let L=IT.filter(x=>!q||lowS([x.t.title,x.t.artist,x.g].join(" ")).includes(q));
+ const cmp={grp:(a,b)=>a.g.localeCompare(b.g,"el")||b.e-a.e,en:(a,b)=>b.e-a.e,enu:(a,b)=>a.e-b.e,tit:(a,b)=>String(a.t.title).localeCompare(String(b.t.title),"el"),chg:(a,b)=>(b.edited-a.edited)||(Math.abs(b.e-(b.old||b.e))-Math.abs(a.e-(a.old||a.e)))}[EW.sort]||(()=>0);L=L.slice().sort(cmp);
+ const shown=L.slice(0,EW.lim),ed=IT.filter(x=>x.edited).length,groups=new Map();IT.forEach(x=>{const o=groups.get(x.g)||{n:0,s:0};o.n++;o.s+=x.e;groups.set(x.g,o)});
+ let last=null,rows="";shown.forEach(x=>{if(EW.sort==="grp"&&x.g!==last){last=x.g;const o=groups.get(x.g);rows+=`<div class="mr" style="background:var(--ac2);border-radius:8px;margin-top:8px"><b class="ell">${esc(x.g)}</b><span class="mu">${o.n} τραγούδια · μέση ${(o.s/o.n).toFixed(1)}</span><button class="sm" data-gd="${esc(x.g)}:-1">−1</button><button class="sm" data-gd="${esc(x.g)}:1">+1</button></div>`}
+  const i=IT.indexOf(x);rows+=`<div class="mr"${x.edited?' style="background:var(--ac2)"':""}><button class="sm" data-pl="${i}" title="Ακρόαση">▶</button><span class="ell" style="flex:2" title="${esc(x.t.title||"")}">${esc(x.t.title||x.t.fname)}<br><span class="mu" style="font-size:12px">${esc(x.t.artist||"")}${x.t.bpm?" · "+Math.round(x.t.bpm)+" BPM":""}${EW.sort!=="grp"?" · "+esc(x.g):""}</span></span>
+   <span class="mu" style="min-width:50px;text-align:right" title="Προηγούμενη τιμή">${x.old?x.old+" →":"—"}</span><div class="recm" style="max-width:70px;background:var(--bd)"><i style="left:0;right:auto;width:${x.e*10}%;background:var(--ac)"></i></div>
+   <select data-e="${i}">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option ${n===x.e?"selected":""}>${n}</option>`).join("")}</select></div>`});
+ m.innerHTML=`<div class="mc" style="max-width:760px"><div class="mh"><h2>⚡ Έλεγχος ενέργειας</h2><button class="x">×</button></div>
+ <p class="mu">${IT.length} τραγούδια αναλύθηκαν · ${ed} διορθώσεις. <b>Τίποτα δεν έχει αποθηκευτεί ακόμα.</b> Άλλαξε τις τιμές που δεν σου κάθονται (ή +1/−1 σε ολόκληρο είδος) και πάτα Αποθήκευση.</p>
+ <div class="mt"><select id="en_m2">${ENMODES.map(([v,l])=>`<option value="${v}" ${v===ENS.mode?"selected":""}>Σύγκριση: ${l}</option>`).join("")}</select><select id="en_o"><option value="grp">Ομαδοποίηση ανά είδος</option><option value="en">Ενέργεια ↓</option><option value="enu">Ενέργεια ↑</option><option value="tit">Τίτλος</option><option value="chg">Διορθωμένα / μεγάλη αλλαγή</option></select><input id="en_q" placeholder="Αναζήτηση…" value="${esc(EW.filter)}" style="flex:1;min-width:120px"></div>
+ <div style="max-height:52vh;overflow:auto">${rows||'<p class="mu">Κανένα αποτέλεσμα.</p>'}${L.length>shown.length?`<button class="sm" id="en_more" style="margin:8px 0">Εμφάνιση περισσότερων (${L.length-shown.length})</button>`:""}</div>
+ <div class="mt" style="margin-top:12px"><button class="big" id="en_save" style="padding:10px 22px;font-size:15px">💾 Αποθήκευση (${IT.length})</button><button class="sm" id="en_new">↩ Νέα ανάλυση</button><button class="sm danger" id="en_x">Απόρριψη</button></div></div>`;
+ $("en_o").value=EW.sort;
+ m.onchange=e=>{const x=e.target;if(x.dataset.e!==undefined){const it=IT[+x.dataset.e];it.e=+x.value;it.edited=it.e!==it.auto;if(!it.edited)it.e=it.auto;enReview(m)}
+  else if(x.id==="en_m2"){ENS.mode=x.value;saveENS();enRerank();enReview(m)}else if(x.id==="en_o"){EW.sort=x.value;EW.lim=200;enReview(m)}};
+ m.oninput=e=>{if(e.target.id==="en_q"){EW.filter=e.target.value;clearTimeout(EW.qt);EW.qt=setTimeout(()=>{enReview(m);const i=$("en_q");i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)}};
+ m.onclick=e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.pl!==undefined){const t=IT[+b.dataset.pl].t;startQ([t],t,0)}
+  else if(b.dataset.gd){const k=b.dataset.gd.lastIndexOf(":"),g=b.dataset.gd.slice(0,k),d=+b.dataset.gd.slice(k+1);IT.forEach(x=>{if(x.g===g){const n=Math.max(1,Math.min(10,x.e+d));if(n!==x.e){x.e=n;x.edited=n!==x.auto}}});enReview(m)}
+  else if(b.id==="en_more"){EW.lim+=300;enReview(m)}
+  else if(b.id==="en_new"){EW.stage="setup";energyModal()}
+  else if(b.id==="en_x"){if(confirm("Να απορριφθούν τα αποτελέσματα χωρίς αποθήκευση;")){EW.items=[];EW.stage="setup";energyModal()}}
+  else if(b.id==="en_save"){IT.forEach(x=>{const t=x.t;t.energy=x.e;t.egrp=x.g;t.efeat=x.f;t.eraw=x.raw;t.esrc=x.edited?"manual":"auto"});idbDirty=true;toast("Αποθηκεύτηκε η ενέργεια σε "+IT.length+" τραγούδια");EW.items=[];EW.stage="setup";m.classList.add("hide")}};djAddTabs("en")}
+energyModal=(f=>function(){f.apply(this,arguments);if(EW.stage==="setup")djAddTabs("en")})(energyModal);
+Object.assign(EXACT,{"⚡ Ανάλυση ενέργειας":"⚡ Energy analysis","⚡ Έλεγχος ενέργειας":"⚡ Energy review","⚡ Ενέργεια":"⚡ Energy","⚡ Έναρξη ανάλυσης":"⚡ Start analysis","Σύγκριση μέσα σε":"Compare within","Ποια τραγούδια":"Which tracks","Μόνο όσα δεν έχουν ενέργεια":"Only tracks without energy","Όσα δεν έχουν + τα αυτόματα (επανεκτίμηση)":"Without energy + automatic ones (re-estimate)","Όλα":"All","Ίδιο είδος (πρώτο είδος του τραγουδιού)":"Same genre (the track's first genre)","Ίδιος φάκελος":"Same folder","Όλη η βιβλιοθήκη":"Whole library","Τραγούδια με αρχείο":"Tracks with a file","Με γνωστή ενέργεια":"With known energy","Καθαρισμός επιλογής":"Clear selection","Εμφάνιση περισσότερων":"Show more","↩ Νέα ανάλυση":"↩ New analysis","Απόρριψη":"Discard","⏹ Διακοπή (προβολή όσων αναλύθηκαν)":"⏹ Stop (show what was analyzed)","↩ Επιστροφή στα αποτελέσματα":"↩ Back to the results"});
 </script><script type="text/plain" id="lamesrc">function lamejs(){function X(c){return new Int32Array(c)}function K(c){return new Float32Array(c)}function ca(c){if(1==c.length)return K(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(ca(c));return n}function Ia(c){if(1==c.length)return X(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(Ia(c));return n}function dc(c){if(1==c.length)return new Int16Array(c[0]);var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(dc(c));return n}function Ob(c){if(1==c.length)return Array(c[0]);
 var k=c[0];c=c.slice(1);for(var n=[],u=0;u<k;u++)n.push(Ob(c));return n}function ra(c){this.ordinal=c}function G(c){this.ordinal=c}function la(c){this.ordinal=function(){return c}}function mc(){this.getLameVersion=function(){return"3.98.4"};this.getLameShortVersion=function(){return"3.98.4"};this.getLameVeryShortVersion=function(){return"LAME3.98r"};this.getPsyVersion=function(){return"0.93"};this.getLameUrl=function(){return"http://www.mp3dev.org/"};this.getLameOsBitness=function(){return"32bits"}}
 function Y(){function c(f,b,c,a,m,k){for(;0!=m--;)c[a]=1E-10+f[b+0]*k[0]-c[a-1]*k[1]+f[b-1]*k[2]-c[a-2]*k[3]+f[b-2]*k[4]-c[a-3]*k[5]+f[b-3]*k[6]-c[a-4]*k[7]+f[b-4]*k[8]-c[a-5]*k[9]+f[b-5]*k[10]-c[a-6]*k[11]+f[b-6]*k[12]-c[a-7]*k[13]+f[b-7]*k[14]-c[a-8]*k[15]+f[b-8]*k[16]-c[a-9]*k[17]+f[b-9]*k[18]-c[a-10]*k[19]+f[b-10]*k[20],++a,++b}function k(f,b,c,a,m,k){for(;0!=m--;)c[a]=f[b+0]*k[0]-c[a-1]*k[1]+f[b-1]*k[2]-c[a-2]*k[3]+f[b-2]*k[4],++a,++b}function n(f){return f*f}var V=Y.RMS_WINDOW_TIME_NUMERATOR,
