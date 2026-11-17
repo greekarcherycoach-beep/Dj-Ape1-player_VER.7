@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('desktop', {
     fileOpen: (dir, name) => invoke('native:fileOpen', dir, name),
     fileWrite: (id, bytes, position) => invoke('native:fileWrite', id, bytes, position),
     fileClose: (id) => invoke('native:fileClose', id),
+    showItem: (p) => invoke('native:showItem', p),
     libSave: (json) => invoke('lib:save', json),
     libLoad: () => invoke('lib:load'),
     libInfo: () => invoke('lib:info'),
