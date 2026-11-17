@@ -2393,7 +2393,7 @@ if(NATIVE){window.desktop.getCrash().then(c=>{if(c&&c.crashed)setTimeout(async()
 /* ===== v24: Record (MP3 320 kbps / FLAC) ===== */
 /* desktop: the djfile:// protocol answers with CORS headers, so the audio can be captured by Web Audio */
 if(NATIVE){au.crossOrigin="anonymous";const _A=window.Audio;window.Audio=function(...a){const e=new _A(...a);e.crossOrigin="anonymous";return e};window.Audio.prototype=_A.prototype}
-document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#recbtn{white-space:nowrap}#recbtn.on{background:#c62828;color:#fff;border-color:#c62828;animation:recp 1.4s ease-in-out infinite}#recbtn.pz{animation:none;background:#8a6d1a;border-color:#8a6d1a;color:#fff}@keyframes recp{50%{opacity:.62}}.recm{position:relative;height:10px;flex:1;border-radius:99px;overflow:hidden;background:linear-gradient(90deg,#4ade80 0,#4ade80 70%,#facc15 70%,#facc15 90%,#f43f5e 90%)}.recm i{position:absolute;right:0;top:0;bottom:0;width:100%;background:var(--bd);transition:width .08s}"}));
+document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#recbtn{white-space:nowrap}#recbtn.on{background:#c62828;color:#fff;font-weight:700;animation:recp 1.4s ease-in-out infinite}#recbtn.pz{animation:none;background:#8a6d1a;color:#fff;font-weight:700}.top #recbtn.on:hover{background:#d32f2f}@keyframes recp{50%{opacity:.62}}.recm{position:relative;height:10px;flex:1;border-radius:99px;overflow:hidden;background:linear-gradient(90deg,#4ade80 0,#4ade80 70%,#facc15 70%,#facc15 90%,#f43f5e 90%)}.recm i{position:absolute;right:0;top:0;bottom:0;width:100%;background:var(--bd);transition:width .08s}"}));
 const REC={state:"idle",paused:false,ctx:null,bus:null,wl:0,node:null,enc:null,fmt:"mp3",dir:null,writer:null,wq:Promise.resolve(),chunks:[],bytes:0,frames:0,rate:44100,pk:0,pkShow:0,peakAll:0,fname:"",doneRes:null,err:null,idle:0,warned:false};
 let RCS={fmt:"mp3",name:"DjApe1_{date}_{time}",auto:0};try{Object.assign(RCS,JSON.parse(localStorage.getItem("mlrec")||"{}"))}catch(e){}
 const saveRCS=()=>{try{localStorage.setItem("mlrec",JSON.stringify(RCS))}catch(e){}};
@@ -2491,7 +2491,7 @@ async function recUnique(dir,name){const m=/^(.*)(\.[^.]+)$/.exec(name),b=m[1],e
 function recDownload(name,parts,mime){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(parts,{type:mime}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},60000)}
 async function recStart(){if(REC.state!=="idle")return;
  if(S.hifi){toast("Ο Audiophile mode είναι ενεργός — απενεργοποίησέ τον για να κάνεις εγγραφή");return}
- const fmt=RCS.fmt;if(!await recInit())return;
+ const fmt0=RCS.fmt,fmt=fmt0==="mp3cd"?"mp3":fmt0;if(!await recInit())return;
  if(fmt==="mp3"&&!await recLoadLame()){toast("Δεν φορτώθηκε ο κωδικοποιητής MP3 (χρειάζεται internet) — δοκίμασε FLAC");return}
  let name=recName()+(fmt==="mp3"?".mp3":".flac");REC.writer=null;REC.chunks=[];
  if(NW&&RCS.ndir){try{const n=window.desktop.native,o=await n.fileOpen(RCS.ndir,name);name=o.name||name;const id=o.id;REC.writer={write:async x=>{if(x instanceof Uint8Array)await n.fileWrite(id,x,null);else await n.fileWrite(id,x.data,x.position)},close:()=>n.fileClose(id)}}catch(e){toast("Δεν ήταν δυνατή η δημιουργία του αρχείου στον φάκελο");return}}
@@ -2503,7 +2503,7 @@ async function recStart(){if(REC.state!=="idle")return;
  try{if(!REC.wl){await c.audioWorklet.addModule(URL.createObjectURL(new Blob([RECW],{type:"application/javascript"})));REC.wl=1}
   node=new AudioWorkletNode(c,"dj-rec",{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],channelCount:2,channelCountMode:"explicit"});node.port.onmessage=e=>recChunk(e.data)}
  catch(e){node=c.createScriptProcessor(4096,2,2);node.onaudioprocess=ev=>{const b=ev.inputBuffer;recChunk({l:b.getChannelData(0).slice(),r:b.getChannelData(Math.min(1,b.numberOfChannels-1)).slice()})}}
- REC.fmt=fmt;REC.fname=name;REC.bytes=0;REC.frames=0;REC.pk=0;REC.pkShow=0;REC.peakAll=0;REC.paused=false;REC.warned=false;REC.idle=0;REC.wq=Promise.resolve();REC.err=null;const sr=c.sampleRate,dr=fmt==="flac16cd"?44100:sr;REC.rs=dr!==sr?rsNew(sr,dr):null;REC.rate=dr;
+ REC.fmt=fmt;REC.fname=name;REC.bytes=0;REC.frames=0;REC.pk=0;REC.pkShow=0;REC.peakAll=0;REC.paused=false;REC.warned=false;REC.idle=0;REC.wq=Promise.resolve();REC.err=null;const sr=c.sampleRate,dr=(fmt0==="flac16cd"||fmt0==="mp3cd")?44100:sr;REC.rs=dr!==sr?rsNew(sr,dr):null;REC.rate=dr;
  if(fmt==="mp3")REC.enc=new lamejs.Mp3Encoder(2,REC.rate,320);else{REC.enc=flacNew(REC.rate,fmt==="flac24"?24:16);recWrite(REC.enc.head())}
  REC.node=node;REC.bus.connect(node);node.connect(c.destination);REC.state="rec";recUI();toast("⏺ Η εγγραφή ξεκίνησε: "+name)}
 async function recStop(){if(REC.state!=="rec")return;REC.state="stop";recUI();const n=REC.node;
@@ -2517,7 +2517,7 @@ async function recStop(){if(REC.state!=="rec")return;REC.state="stop";recUI();co
  catch(e){ok=false;console.error(e);try{if(REC.writer)await REC.writer.close()}catch(x){}toast("⚠ Σφάλμα αποθήκευσης εγγραφής: "+(e&&e.message||e))}
  const nm=REC.fname,mb=(REC.bytes/1048576).toFixed(1);REC.enc=null;REC.rs=null;REC.chunks=[];REC.writer=null;REC.state="idle";REC.paused=false;recUI();
  if(ok)toast(`✅ Η εγγραφή αποθηκεύτηκε: ${nm} (${mb} MB)`)}
-function recUI(){const b=$("recbtn");if(!b)return;const on=REC.state!=="idle";b.classList.toggle("on",on&&!REC.paused);b.classList.toggle("pz",on&&REC.paused);b.textContent=on?(REC.paused?"⏸ ":"⏺ ")+recT(REC.frames/REC.rate):"⏺"}
+function recUI(){const b=$("recbtn");if(!b)return;const on=REC.state!=="idle";b.classList.toggle("on",on&&!REC.paused);b.classList.toggle("pz",on&&REC.paused);b.textContent=on?(REC.paused?"⏸ ":"🔴 ")+recT(REC.frames/REC.rate):"🔴 Rec"}
 setInterval(()=>{if(REC.state!=="rec")return;recUI();
  const lvl=REC.pk>0?Math.max(0,Math.min(1,(20*Math.log10(REC.pk)+60)/60)):0;REC.pk=0;REC.pkShow=Math.max(lvl,REC.pkShow*.6);
  if($("rc_t")){$("rc_t").textContent=recT(REC.frames/REC.rate);$("rc_s").textContent=(REC.bytes/1048576).toFixed(1)+" MB";$("rc_m").style.width=(100-REC.pkShow*100)+"%"}
@@ -2526,7 +2526,7 @@ setInterval(()=>{if(REC.state!=="rec")return;recUI();
 if(!NATIVE)window.addEventListener("beforeunload",e=>{if(REC.state!=="idle"){e.preventDefault();e.returnValue=""}});
 
 /* ---- UI ---- */
-function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.state==="rec",kh=REC.ctx?+(REC.ctx.sampleRate/1000).toFixed(1):48,ft=[["mp3","MP3 320 kbps (CBR) · "+kh+" kHz"],["flac16cd","FLAC 16-bit · 44.1 kHz (CD standard)"],["flac16","FLAC 16-bit · "+kh+" kHz"],["flac24","FLAC 24-bit · "+kh+" kHz"]],direct=(FSA&&REC.dir)||(NW&&RCS.ndir);
+function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.state==="rec",kh=REC.ctx?+(REC.ctx.sampleRate/1000).toFixed(1):48,ft=[["mp3cd","MP3 320 kbps (CBR) · 44.1 kHz (CD standard)"],["mp3","MP3 320 kbps (CBR) · "+kh+" kHz"],["flac16cd","FLAC 16-bit · 44.1 kHz (CD standard)"],["flac16","FLAC 16-bit · "+kh+" kHz"],["flac24","FLAC 24-bit · "+kh+" kHz"]],direct=(FSA&&REC.dir)||(NW&&RCS.ndir);
  const dirTxt=NW?(RCS.ndir?"📁 "+esc(RCS.ndir):"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει στον φάκελο Λήψεων"):FSA?(REC.dir?"📁 "+esc(REC.dir.name):"Δεν έχει επιλεγεί φάκελος — το αρχείο θα κατέβει από τον browser"):"Το αρχείο θα κατέβει στον φάκελο Λήψεων";
  m.innerHTML=`<div class="mc" style="max-width:560px"><div class="mh"><h2>⏺ Εγγραφή</h2><button class="x">×</button></div>
  <p class="mu" style="margin:6px 0 12px">Καταγράφει ό,τι παίζει το πρόγραμμα, μαζί με τις μεταβάσεις και τα crossfade του Dj mode. Μπορείς να πατήσεις Έναρξη και μετά Play.</p>
@@ -2539,7 +2539,7 @@ function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.s
  <p class="mu" style="font-size:12px">Μέγεθος ανά ώρα: MP3 320 ≈ 144 MB · FLAC 16-bit ≈ 300–500 MB · FLAC 24-bit ≈ 450–750 MB.${direct?"":" Χωρίς επιλογή φακέλου το αρχείο κρατιέται στη μνήμη μέχρι να σταματήσεις την εγγραφή."}</p>
  <div class="mt">${on?`<button class="big" id="rc_stop" style="background:#c62828;padding:10px 22px;font-size:15px">⏹ Διακοπή &amp; αποθήκευση</button><button class="sm" id="rc_p">${REC.paused?"▶ Συνέχεια":"⏸ Παύση"}</button>`:`<button class="big" id="rc_go" style="background:#c62828;padding:10px 22px;font-size:15px">⏺ Έναρξη εγγραφής</button>`}</div></div>`;
  $("rc_f").value=RCS.fmt;
- const rd=()=>{RCS.fmt=$("rc_f").value;RCS.name=$("rc_n").value.trim()||"DjApe1_{date}_{time}";RCS.auto=$("rc_a").checked?1:0;saveRCS()},pv=()=>{const e=$("rc_pv");if(e)e.textContent=recName()+(RCS.fmt==="mp3"?".mp3":".flac")};pv();
+ const rd=()=>{RCS.fmt=$("rc_f").value;RCS.name=$("rc_n").value.trim()||"DjApe1_{date}_{time}";RCS.auto=$("rc_a").checked?1:0;saveRCS()},pv=()=>{const e=$("rc_pv");if(e)e.textContent=recName()+(/^mp3/.test(RCS.fmt)?".mp3":".flac")};pv();
  m.onchange=m.oninput=e=>{if(e.target.id&&e.target.id.startsWith("rc_")){rd();pv()}};
  m.onclick=async e=>{if(e.target===m||e.target.className==="x"){m.classList.add("hide");return}const id=e.target.id;
   if(id==="rc_d"&&NW){try{const pth=await window.desktop.native.pickFolder();if(pth){RCS.ndir=pth;saveRCS();recModal()}}catch(x){}}
@@ -2548,7 +2548,7 @@ function recModal(){const m=$("modal");m.classList.remove("hide");const on=REC.s
   else if(id==="rc_go"){rd();m.classList.add("hide");await recStart()}
   else if(id==="rc_stop"){m.classList.add("hide");await recStop()}
   else if(id==="rc_p"){REC.paused=!REC.paused;recUI();recModal()}};}
-{const tp=document.querySelector(".top .topr"),b=document.createElement("button");b.className="sm";b.id="recbtn";b.textContent="⏺";b.title="Εγγραφή (MP3 320 / FLAC)";b.onclick=()=>recModal();const mb=$("minibtn");tp.insertBefore(b,mb||null)}
+{const tp=document.querySelector(".top .topr"),b=document.createElement("button");b.className="sm";b.id="recbtn";b.textContent="🔴 Rec";b.title="Εγγραφή (MP3 320 / FLAC)";b.onclick=()=>recModal();const mb=$("minibtn");tp.insertBefore(b,mb||null)}
 /* English strings */
 Object.assign(EXACT,{"Εγγραφή (MP3 320 / FLAC)":"Record (MP3 320 / FLAC)","⏺ Εγγραφή":"⏺ Record",
 "Καταγράφει ό,τι παίζει το πρόγραμμα, μαζί με τις μεταβάσεις και τα crossfade του Dj mode. Μπορείς να πατήσεις Έναρξη και μετά Play.":"Records whatever the program plays, including the Dj mode transitions and crossfades. You can press Start first and then Play.",
