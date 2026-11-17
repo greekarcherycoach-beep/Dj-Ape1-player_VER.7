@@ -792,7 +792,7 @@ setInterval(()=>{if(auto&&dirty&&fh)saveLib(true)},8000);
 const au=$("au");
 function shuffled(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function buildQ(first){Q=shuf?[first,...shuffled(QL.filter(x=>x!==first))]:QL.slice();qi=Q.indexOf(first)}
-function startQ(list,t,fade){fadeSec=fade||0;AMX=pendingAMX||(list&&list.some(x=>x&&x.mix)?{fout:0,fin:0,ov:true,trimS:false,trimE:false,smart:false,thr:-50,man:1}:null);pendingAMX=null;if(!fadeSec)au.volume=1;QL=list.filter(x=>x.file);
+function startQ(list,t,fade){fadeSec=fade||((pendingAMX||(list&&list.some(x=>x&&x.mix)))?0:+S.xfade||0);AMX=pendingAMX||(list&&list.some(x=>x&&x.mix)?{fout:0,fin:0,ov:true,trimS:false,trimE:false,smart:false,thr:-50,man:1}:null);pendingAMX=null;if(!fadeSec)au.volume=1;QL=list.filter(x=>x.file);
  if(!QL.length){toast("Για αναπαραγωγή πρόσθεσε ξανά τον φάκελο με τα αρχεία (➕ Προσθήκη φακέλου)");return}
  if(!t||!t.file)t=shuf?QL[Math.random()*QL.length|0]:QL[0];buildQ(t);cue(qi)}
 function cue(i){qi=i;cur=Q[i];COUNTED.delete(cur);if(curUrl){const o=curUrl;setTimeout(()=>URL.revokeObjectURL(o),30000)}curUrl=cur.file.native?cur.file.url:URL.createObjectURL(cur.file);au.src=curUrl;au.play().catch(()=>{});
@@ -1058,13 +1058,13 @@ function amTick(){const pl=amCalc();if(!pl)return;const t=au.currentTime,hasNext
 au.addEventListener("seeked",()=>{amFired=false});
 setInterval(()=>{
  if(S.hifi&&(fadeSec||gh)){fadeSec=0;ghKill();au.volume=1}
- if(gh&&xf){const k=1-(performance.now()-ghT0)/1000/Math.max(.5,ghL||fadeSec||1);if(k<=0)ghKill();else gh.volume=fcv(k,ghCv)}
+ if(gh&&xf){const k=1-(performance.now()-ghT0)/1000/Math.max(.5,ghL||fadeSec||1);if(k<=0)ghKill();else gh.volume=fcv(k,ghCv||S.xfcv)}
  if(AMX&&!S.hifi&&cur&&au.duration&&!au.paused){amTick();return}
  if(!fadeSec||!au.duration||au.paused)return;
  const F=Math.max(.5,Math.min(fadeSec,au.duration/3)),left=au.duration-au.currentTime,hasNext=rep!==2&&(qi+1<Q.length||rep===1);
  if(hasNext&&!gh&&left<=F+2.5&&left>0&&au.currentTime>1){const g=new Audio();if(S.sink&&g.setSinkId)g.setSinkId(S.sink).catch(()=>{});g.src=curUrl;g.muted=true;g.preload="auto";try{g.currentTime=au.currentTime}catch(e){}g.ready=false;gh=g;g.play().then(()=>{if(gh===g)g.ready=true}).catch(()=>{if(gh===g)gh=null})}
  if(gh&&!xf&&gh.ready&&left<=F&&hasNext){try{gh.currentTime=au.currentTime}catch(e){}gh.muted=false;gh.volume=1;xf=true;ghT0=performance.now();ghL=0;xfCue=true;try{next()}finally{xfCue=false}au.volume=.05;return}
- const out=(gh&&hasNext)?1:left/F;au.volume=Math.max(0,Math.min(1,out,au.currentTime/F+.05))},100);
+ const cvx=S.xfcv,out=(gh&&hasNext)?1:fcv(left/F,cvx);au.volume=Math.max(0,Math.min(1,out,fcv(au.currentTime/F,cvx)+.04))},40);
 const camDist=(a,b)=>{const na=parseInt(a),nb=parseInt(b),d=Math.min((na-nb+12)%12,(nb-na+12)%12);return a.slice(-1)===b.slice(-1)?d:(d===0?1:d+2)};
 const byKey=(arr,d)=>arr.slice().sort((a,b)=>{const x=keyVal(a),y=keyVal(b);if(!x!==!y)return x?-1:1;return(x-y)*d});
 const byBpm=arr=>arr.slice().sort((a,b)=>{if(!a.bpm!==!b.bpm)return a.bpm?-1:1;return a.bpm-b.bpm});
@@ -1173,7 +1173,7 @@ const EXACT={
 "Χρώμα του key":"Key color","Ένα χρώμα":"Single color","Πλήθος μπάρων":"Number of bars","Ευαισθησία":"Sensitivity","Ομαλότητα":"Smoothness",
 "Φωτεινότητα φόντου (πλήρης οθόνη)":"Background brightness (fullscreen)","Κορυφές (peaks)":"Peak caps","Λάμψη (glow)":"Glow","Ποιότητα":"Quality",
 "Οικονομική (30 fps)":"Economy (30 fps)","Υψηλή (60 fps)":"High (60 fps)",
-"📂 Εμφάνιση φακέλου":"📂 Show folder","▶ Παίξε φάκελο (χωρίς βιβλιοθήκη)":"▶ Play folder (no library)","▶ Παίξε αρχεία (χωρίς βιβλιοθήκη)":"▶ Play files (no library)","▶ Παίξε φάκελο":"▶ Play folder","▶ Παίξε αρχεία":"▶ Play files","▶ Παίξε μόνο, χωρίς βιβλιοθήκη":"▶ Play only, no library","Προσθήκη μουσικής":"Add music","📁 Φάκελοι…":"📁 Folders…","🎵 Αρχεία…":"🎵 Files…","📂 Άνοιγμα βιβλιοθήκης":"📂 Open library","➕ Νέα playlist":"➕ New playlist",
+"📂 Εμφάνιση φακέλου":"📂 Show folder","🔀 Crossfade τραγουδιών":"🔀 Song crossfade","Ισχύος (φυσική)":"Equal-power (natural)","Γραμμική":"Linear","▶ Παίξε φάκελο (χωρίς βιβλιοθήκη)":"▶ Play folder (no library)","▶ Παίξε αρχεία (χωρίς βιβλιοθήκη)":"▶ Play files (no library)","▶ Παίξε φάκελο":"▶ Play folder","▶ Παίξε αρχεία":"▶ Play files","▶ Παίξε μόνο, χωρίς βιβλιοθήκη":"▶ Play only, no library","Προσθήκη μουσικής":"Add music","📁 Φάκελοι…":"📁 Folders…","🎵 Αρχεία…":"🎵 Files…","📂 Άνοιγμα βιβλιοθήκης":"📂 Open library","➕ Νέα playlist":"➕ New playlist",
 "Πλαϊνό μενού":"Sidebar","Αναζήτηση…":"Search…","▶ Αναπαραγωγή ▾":"▶ Play ▾","▶ Αναπαραγωγή όλων":"▶ Play all","🔀 Τυχαία με φίλτρα…":"🔀 Shuffle with filters…",
 "👁 Προβολή ▾":"👁 View ▾","☰ Πίνακας":"☰ Table","▦ Κάρτες":"▦ Cards","Ταξινόμηση":"Sort","⚙ Παραμετροποίηση οθόνης…":"⚙ Customize display…","🙈 Απόκρυψη μενού":"🙈 Hide menus",
 "Περισσότερα":"More","☑ Επιλογή τραγουδιών":"☑ Select tracks","Εμφάνιση μενού":"Show menus","🎶 Προσθήκη στη playlist":"🎶 Add to playlist","ⓘ Πληροφορίες / επεξεργασία":"ⓘ Info / edit",
@@ -1427,7 +1427,7 @@ document.querySelectorAll(".langsel").forEach(x=>x.value=lang);document.document
 
 /* ===== v9: menus, settings, hide menus ===== */
 let VIS=[];
-const SD={persist:1,watch:1,wave:1,autolink:1,sb:1,tb:1,stat:1,dens:"n",hideEmpty:1,player:"track",queue:"playlist",autoFS:0,toast:1,gen:1,pls:1,acts:"hover",focus:0,sink:"",hifi:0,autoopen:0,skipdup:1,autodj:0};
+const SD={xfade:5,xfcv:"eq",persist:1,watch:1,wave:1,autolink:1,sb:1,tb:1,stat:1,dens:"n",hideEmpty:1,player:"track",queue:"playlist",autoFS:0,toast:1,gen:1,pls:1,acts:"hover",focus:0,sink:"",hifi:0,autoopen:0,skipdup:1,autodj:0};
 let S=Object.assign({},SD);try{Object.assign(S,JSON.parse(localStorage.getItem("mlset")||"{}"))}catch(e){}
 const saveS=()=>{try{localStorage.setItem("mlset",JSON.stringify(S))}catch(e){}};
 function syncPlayer(){const show=S.player==="always"||(S.player==="track"&&!!cur);$("player").classList.toggle("hide",!show);document.body.classList.toggle("hasp",show);
@@ -1726,7 +1726,11 @@ function setHifi(on){S.hifi=on?1:0;saveS();document.body.classList.toggle("hifi"
 function audioHTML(){return `<div class="row"><span class="mu">Έξοδος</span><select id="a_dev"><option value="">Προεπιλογή συστήματος</option></select></div>
  <div class="row"><button class="sm" id="a_ref" data-keep>🔄 Ανανέωση</button><button class="sm" id="a_pick" data-keep>＋ Επιλογή συσκευής…</button></div><hr>
  <label class="row" style="cursor:pointer"><input type="checkbox" id="a_hifi" ${S.hifi?"checked":""}><span>🎧 Audiophile mode</span></label>
- <div class="mu" style="font-size:12px;padding:0 10px 8px;max-width:300px;white-space:normal">Ο ήχος πηγαίνει από το αρχείο στην έξοδο χωρίς αλλαγή έντασης, crossfade, ανάλυση ή οπτικοποίηση κατά την αναπαραγωγή.</div>`}
+ <div class="mu" style="font-size:12px;padding:0 10px 8px;max-width:300px;white-space:normal">Ο ήχος πηγαίνει από το αρχείο στην έξοδο χωρίς αλλαγή έντασης, crossfade, ανάλυση ή οπτικοποίηση κατά την αναπαραγωγή.</div><hr>
+ <div class="row"><span>🔀 Crossfade τραγουδιών</span><b id="a_xfv">${S.xfade?S.xfade+"″":"Κλειστό"}</b></div>
+ <div class="row"><input type="range" id="a_xf" min="0" max="15" step="1" value="${+S.xfade||0}" style="width:100%"></div>
+ <div class="row"><span class="mu">Καμπύλη</span><select id="a_xc"><option value="eq"${S.xfcv==="lin"?"":" selected"}>Ισχύος (φυσική)</option><option value="lin"${S.xfcv==="lin"?" selected":""}>Γραμμική</option></select></div>
+ <div class="mu" style="font-size:12px;padding:0 10px 8px;max-width:300px;white-space:normal">Το επόμενο τραγούδι μπαίνει πάνω στο τέλος του προηγούμενου. Ισχύει στην κανονική αναπαραγωγή· το Dj mode έχει δικές του ρυθμίσεις μίξης.</div>`}
 async function fillDevs(ask){const sl=$("a_dev");if(!sl)return;let o=[];try{o=await listSinks(ask)}catch(e){}
  sl.innerHTML='<option value="">Προεπιλογή συστήματος</option>'+o.filter(x=>x.deviceId&&x.deviceId!=="default"&&x.deviceId!=="communications").map((x,i)=>`<option value="${esc(x.deviceId)}">${esc(x.label||"Συσκευή "+(i+1))}</option>`).join("");
  if(S.sink&&![...sl.options].some(x=>x.value===S.sink))sl.insertAdjacentHTML("beforeend",`<option value="${esc(S.sink)}">(αποθηκευμένη συσκευή)</option>`);sl.value=S.sink||""}
@@ -1735,6 +1739,8 @@ function audioBind(){if(!$("a_dev"))return;fillDevs(false);
  $("a_ref").onclick=()=>fillDevs(true);
  $("a_pick").onclick=async()=>{try{const d=await navigator.mediaDevices.selectAudioOutput();S.sink=d.deviceId;saveS();await applySink();fillDevs(false)}catch(e){toast("Η επιλογή συσκευής δεν είναι διαθέσιμη εδώ")}};
  $("a_hifi").onchange=e=>setHifi(e.target.checked);
+ $("a_xf").oninput=e=>{S.xfade=+e.target.value;$("a_xfv").textContent=S.xfade?S.xfade+"″":"Κλειστό";if(!AMX)fadeSec=S.xfade;saveS()};
+ $("a_xc").onchange=e=>{S.xfcv=e.target.value;saveS()};
  }
 au.addEventListener("pause",()=>{if(S.hifi)pumpDur()});
 try{navigator.mediaDevices.addEventListener("devicechange",checkSinks)}catch(e){}
